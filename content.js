@@ -11,6 +11,7 @@ const BETTER_PICTURE_MESSAGE_TYPES = {
   STATUS_REQUEST: "BETTER_PICTURE_STATUS_REQUEST"
 };
 
+const SVG_NS = "http://www.w3.org/2000/svg";
 const ROOT_ID = "better-picture-root";
 const MIN_PLAYER_WIDTH = 260;
 const MIN_PLAYER_HEIGHT = 160;
@@ -33,6 +34,49 @@ const CAPTION_SELECTOR = [
   ".jw-text-track-display"
 ].join(",");
 const UNAVAILABLE_SUBTITLE_MESSAGE = "No captions detected. Turn on subtitles in the video player if available.";
+const BUTTON_ICONS = {
+  play: {
+    paths: [
+      { d: "M8 5v14l11-7z", fill: "currentColor", stroke: "none" }
+    ]
+  },
+  pause: {
+    paths: [
+      { d: "M7 5h3v14H7zM14 5h3v14h-3z", fill: "currentColor", stroke: "none" }
+    ]
+  },
+  close: {
+    paths: [
+      { d: "M6 6l12 12M18 6L6 18" }
+    ]
+  },
+  rewind10: {
+    paths: [
+      { d: "M9 7H4V2" },
+      { d: "M5 7a8 8 0 1 1-1.7 8.1" }
+    ],
+    text: { x: "8", y: "16", value: "10" }
+  },
+  forward10: {
+    paths: [
+      { d: "M15 7h5V2" },
+      { d: "M19 7a8 8 0 1 0 1.7 8.1" }
+    ],
+    text: { x: "8", y: "16", value: "10" }
+  },
+  volume: {
+    paths: [
+      { d: "M4 10v4h4l5 4V6l-5 4H4z", fill: "currentColor", stroke: "none" },
+      { d: "M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11" }
+    ]
+  },
+  muted: {
+    paths: [
+      { d: "M4 10v4h4l5 4V6l-5 4H4z", fill: "currentColor", stroke: "none" },
+      { d: "M17 9l4 6M21 9l-4 6" }
+    ]
+  }
+};
 const DOCUMENT_PIP_STYLES = `
   html,
   body {
@@ -100,11 +144,15 @@ const DOCUMENT_PIP_STYLES = `
   }
 
   .better-picture-button {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 30px;
     min-width: 34px;
     min-height: 30px;
     border: 1px solid rgba(229, 231, 235, 0.14);
-    border-radius: 10px;
-    padding: 5px 10px;
+    border-radius: 999px;
+    padding: 0;
     background: #20242d;
     color: #f5f7fb;
     font: inherit;
@@ -112,17 +160,6 @@ const DOCUMENT_PIP_STYLES = `
     font-weight: 760;
     line-height: 1;
     cursor: pointer;
-  }
-
-  .better-picture-button--play {
-    min-width: 52px;
-  }
-
-  .better-picture-button--seek {
-    min-width: 38px;
-    padding-right: 8px;
-    padding-left: 8px;
-    font-variant-numeric: tabular-nums;
   }
 
   .better-picture-button:hover {
@@ -152,7 +189,29 @@ const DOCUMENT_PIP_STYLES = `
   .better-picture-stage {
     position: relative;
     min-height: 0;
+    min-width: 0;
+    overflow: hidden;
     background: #0b0d12;
+  }
+
+  .better-picture-icon {
+    display: block;
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
+  .better-picture-icon text {
+    fill: currentColor;
+    stroke: none;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 7px;
+    font-weight: 900;
+    letter-spacing: 0;
   }
 
   .better-picture-video {
@@ -160,9 +219,12 @@ const DOCUMENT_PIP_STYLES = `
     position: static !important;
     width: 100%;
     height: 100%;
+    min-width: 0 !important;
+    min-height: 0 !important;
     max-width: none !important;
     max-height: none !important;
     object-fit: contain;
+    object-position: center center;
     background: #0b0d12;
     transform: none !important;
   }
@@ -170,7 +232,7 @@ const DOCUMENT_PIP_STYLES = `
   .better-picture-subtitles {
     position: absolute;
     right: 16px;
-    bottom: clamp(10px, 3%, 18px);
+    bottom: clamp(54px, 18%, 78px);
     left: 16px;
     z-index: 2;
     display: flex;
@@ -221,6 +283,67 @@ const DOCUMENT_PIP_STYLES = `
     font-size: 11px;
     font-weight: 680;
     text-shadow: none;
+  }
+
+  .better-picture-controlbar {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto auto minmax(58px, 84px);
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 9px 10px 10px;
+    background: linear-gradient(to top, rgba(8, 10, 15, 0.94), rgba(8, 10, 15, 0.44));
+  }
+
+  .better-picture-time {
+    min-width: 70px;
+    color: #e5e7eb;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .better-picture-range {
+    width: 100%;
+    min-width: 0;
+    accent-color: #f5f7fb;
+    cursor: pointer;
+  }
+
+  .better-picture-range:disabled {
+    cursor: not-allowed;
+    opacity: 0.42;
+  }
+
+  .better-picture-button--compact {
+    width: 32px;
+    height: 30px;
+    min-width: 32px;
+    min-height: 30px;
+  }
+
+  .better-picture-volume {
+    width: 84px;
+  }
+
+  @media (max-width: 360px) {
+    .better-picture-controlbar {
+      grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+      gap: 6px;
+    }
+
+    .better-picture-button--mute,
+    .better-picture-volume {
+      display: none;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -504,10 +627,86 @@ function setImportantStyle(element, property, value) {
   element.style.setProperty(property, value, "important");
 }
 
+function applyDockedVideoFit(video) {
+  video.controls = false;
+  setImportantStyle(video, "display", "block");
+  setImportantStyle(video, "position", "static");
+  setImportantStyle(video, "inset", "auto");
+  setImportantStyle(video, "width", "100%");
+  setImportantStyle(video, "height", "100%");
+  setImportantStyle(video, "min-width", "0");
+  setImportantStyle(video, "min-height", "0");
+  setImportantStyle(video, "max-width", "none");
+  setImportantStyle(video, "max-height", "none");
+  setImportantStyle(video, "object-fit", "contain");
+  setImportantStyle(video, "object-position", "center center");
+  setImportantStyle(video, "transform", "none");
+  setImportantStyle(video, "background", "#0b0d12");
+}
+
+function createVideoFitController(video, stage, hostWindow = window) {
+  let animationFrame = 0;
+  let isApplying = false;
+  let resizeObserver = null;
+
+  const apply = () => {
+    animationFrame = 0;
+    isApplying = true;
+    applyDockedVideoFit(video);
+    stage.style.setProperty("min-width", "0");
+    stage.style.setProperty("min-height", "0");
+    stage.style.setProperty("overflow", "hidden");
+    isApplying = false;
+  };
+
+  const scheduleApply = () => {
+    if (animationFrame) {
+      return;
+    }
+
+    animationFrame = hostWindow.requestAnimationFrame(apply);
+  };
+
+  const Observer = hostWindow.MutationObserver || MutationObserver;
+  const observer = new Observer(() => {
+    if (!isApplying) {
+      scheduleApply();
+    }
+  });
+
+  observer.observe(video, {
+    attributes: true,
+    attributeFilter: ["class", "controls", "height", "style", "width"]
+  });
+
+  const fitEvents = ["loadedmetadata", "loadeddata", "durationchange", "emptied", "resize"];
+  fitEvents.forEach((eventName) => video.addEventListener(eventName, scheduleApply));
+
+  if (hostWindow.ResizeObserver) {
+    resizeObserver = new hostWindow.ResizeObserver(scheduleApply);
+    resizeObserver.observe(stage);
+  }
+
+  apply();
+
+  return {
+    cleanup() {
+      if (animationFrame) {
+        hostWindow.cancelAnimationFrame(animationFrame);
+      }
+
+      observer.disconnect();
+      resizeObserver?.disconnect();
+      fitEvents.forEach((eventName) => video.removeEventListener(eventName, scheduleApply));
+    }
+  };
+}
+
 function dockSourceVideo(video, stage) {
   const parent = video.parentNode;
   const placeholder = document.createComment("better-picture-source-video");
   const originalStyle = video.getAttribute("style");
+  const originalControls = video.controls;
   const originalDisablePictureInPicture = video.disablePictureInPicture;
   const hadBetterPictureClass = video.classList.contains("better-picture-video");
 
@@ -517,16 +716,7 @@ function dockSourceVideo(video, stage) {
 
   video.classList.add("better-picture-video");
   video.disablePictureInPicture = true;
-  setImportantStyle(video, "display", "block");
-  setImportantStyle(video, "position", "static");
-  setImportantStyle(video, "inset", "auto");
-  setImportantStyle(video, "width", "100%");
-  setImportantStyle(video, "height", "100%");
-  setImportantStyle(video, "max-width", "none");
-  setImportantStyle(video, "max-height", "none");
-  setImportantStyle(video, "object-fit", "contain");
-  setImportantStyle(video, "transform", "none");
-  setImportantStyle(video, "background", "#0b0d12");
+  applyDockedVideoFit(video);
   stage.prepend(video);
 
   return {
@@ -546,6 +736,7 @@ function dockSourceVideo(video, stage) {
         video.classList.remove("better-picture-video");
       }
       video.disablePictureInPicture = originalDisablePictureInPicture;
+      video.controls = originalControls;
 
       if (originalStyle === null) {
         video.removeAttribute("style");
@@ -591,6 +782,62 @@ function seekVideoBy(video, seconds) {
   return true;
 }
 
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "--:--";
+  }
+
+  const roundedSeconds = Math.floor(seconds);
+  const hours = Math.floor(roundedSeconds / 3600);
+  const minutes = Math.floor((roundedSeconds % 3600) / 60);
+  const remainingSeconds = roundedSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function createIcon(documentContext, iconName) {
+  const icon = BUTTON_ICONS[iconName];
+  const svg = documentContext.createElementNS(SVG_NS, "svg");
+  svg.classList.add("better-picture-icon");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+
+  icon.paths.forEach((pathDefinition) => {
+    const path = documentContext.createElementNS(SVG_NS, "path");
+
+    Object.entries(pathDefinition).forEach(([attribute, value]) => {
+      path.setAttribute(attribute, value);
+    });
+
+    svg.append(path);
+  });
+
+  if (icon.text) {
+    const text = documentContext.createElementNS(SVG_NS, "text");
+    text.setAttribute("x", icon.text.x);
+    text.setAttribute("y", icon.text.y);
+    text.textContent = icon.text.value;
+    svg.append(text);
+  }
+
+  return svg;
+}
+
+function setButtonIcon(button, iconName, label) {
+  if (button.dataset.iconName !== iconName) {
+    button.replaceChildren(createIcon(button.ownerDocument, iconName));
+    button.dataset.iconName = iconName;
+  }
+
+  button.title = label;
+  button.setAttribute("aria-label", label);
+}
+
 function isEditableTarget(target) {
   return Boolean(target?.isContentEditable) ||
     ["INPUT", "SELECT", "TEXTAREA"].includes(target?.tagName);
@@ -618,28 +865,23 @@ function createMiniPlayer(video, options = {}) {
   controls.className = "better-picture-controls";
 
   const backButton = hostDocument.createElement("button");
-  backButton.className = "better-picture-button better-picture-button--seek";
+  backButton.className = "better-picture-button better-picture-button--compact better-picture-button--seek";
   backButton.type = "button";
-  backButton.textContent = "-10";
-  backButton.title = "Back 10 seconds";
-  backButton.setAttribute("aria-label", "Back 10 seconds");
+  setButtonIcon(backButton, "rewind10", "Back 10 seconds");
 
   const playButton = hostDocument.createElement("button");
-  playButton.className = "better-picture-button better-picture-button--play";
+  playButton.className = "better-picture-button better-picture-button--compact better-picture-button--play";
   playButton.type = "button";
 
   const forwardButton = hostDocument.createElement("button");
-  forwardButton.className = "better-picture-button better-picture-button--seek";
+  forwardButton.className = "better-picture-button better-picture-button--compact better-picture-button--seek";
   forwardButton.type = "button";
-  forwardButton.textContent = "+10";
-  forwardButton.title = "Forward 10 seconds";
-  forwardButton.setAttribute("aria-label", "Forward 10 seconds");
+  setButtonIcon(forwardButton, "forward10", "Forward 10 seconds");
 
   const closeButton = hostDocument.createElement("button");
   closeButton.className = "better-picture-button";
   closeButton.type = "button";
-  closeButton.textContent = "X";
-  closeButton.setAttribute("aria-label", "Close Better Picture");
+  setButtonIcon(closeButton, "close", "Close Better Picture");
 
   const stage = hostDocument.createElement("div");
   stage.className = "better-picture-stage";
@@ -649,13 +891,43 @@ function createMiniPlayer(video, options = {}) {
   subtitleLayer.textContent = UNAVAILABLE_SUBTITLE_MESSAGE;
   subtitleLayer.dataset.subtitleMode = "unavailable";
 
+  const controlBar = hostDocument.createElement("div");
+  controlBar.className = "better-picture-controlbar";
+
+  const seekRange = hostDocument.createElement("input");
+  seekRange.className = "better-picture-range better-picture-seekbar";
+  seekRange.type = "range";
+  seekRange.min = "0";
+  seekRange.max = "1";
+  seekRange.step = "0.1";
+  seekRange.value = "0";
+  seekRange.setAttribute("aria-label", "Seek video");
+
+  const timeLabel = hostDocument.createElement("div");
+  timeLabel.className = "better-picture-time";
+  timeLabel.textContent = "--:-- / --:--";
+
+  const muteButton = hostDocument.createElement("button");
+  muteButton.className = "better-picture-button better-picture-button--compact better-picture-button--mute";
+  muteButton.type = "button";
+
+  const volumeRange = hostDocument.createElement("input");
+  volumeRange.className = "better-picture-range better-picture-volume";
+  volumeRange.type = "range";
+  volumeRange.min = "0";
+  volumeRange.max = "1";
+  volumeRange.step = "0.01";
+  volumeRange.value = String(video.muted ? 0 : video.volume);
+  volumeRange.setAttribute("aria-label", "Volume");
+
   const resizeHandle = hostDocument.createElement("div");
   resizeHandle.className = "better-picture-resize";
   resizeHandle.setAttribute("aria-hidden", "true");
 
-  controls.append(backButton, playButton, forwardButton, closeButton);
+  controls.append(closeButton);
   header.append(title, controls);
-  stage.append(subtitleLayer);
+  controlBar.append(backButton, playButton, seekRange, timeLabel, forwardButton, muteButton, volumeRange);
+  stage.append(subtitleLayer, controlBar);
   player.append(header, stage);
 
   if (!isDocumentPip) {
@@ -666,15 +938,44 @@ function createMiniPlayer(video, options = {}) {
   (hostDocument.body || hostDocument.documentElement).append(root);
 
   const dockController = dockSourceVideo(video, stage);
+  const videoFitController = createVideoFitController(video, stage, hostWindow);
+  let isScrubbing = false;
 
   const syncTransportControls = () => {
     const bounds = getSeekBounds(video);
     const canSeek = Boolean(bounds);
 
-    playButton.textContent = video.paused ? "Play" : "Pause";
-    playButton.setAttribute("aria-label", video.paused ? "Play video" : "Pause video");
+    setButtonIcon(playButton, video.paused ? "play" : "pause", video.paused ? "Play video" : "Pause video");
     backButton.disabled = !canSeek || video.currentTime <= bounds.start + 0.25;
     forwardButton.disabled = !canSeek || video.currentTime >= bounds.end - 0.25;
+
+    seekRange.disabled = !canSeek;
+
+    if (canSeek) {
+      seekRange.min = String(bounds.start);
+      seekRange.max = String(bounds.end);
+
+      if (!isScrubbing) {
+        seekRange.value = String(clamp(video.currentTime, bounds.start, bounds.end));
+      }
+
+      timeLabel.textContent = `${formatTime(video.currentTime - bounds.start)} / ${formatTime(bounds.end - bounds.start)}`;
+    } else {
+      seekRange.min = "0";
+      seekRange.max = "1";
+      seekRange.value = "0";
+      timeLabel.textContent = `${formatTime(video.currentTime)} / --:--`;
+    }
+  };
+
+  const syncVolumeControls = () => {
+    const audibleVolume = video.muted ? 0 : video.volume;
+    volumeRange.value = String(audibleVolume);
+    setButtonIcon(
+      muteButton,
+      video.muted || video.volume === 0 ? "muted" : "volume",
+      video.muted || video.volume === 0 ? "Unmute video" : "Mute video"
+    );
   };
 
   const onPlayPauseClick = () => {
@@ -693,6 +994,47 @@ function createMiniPlayer(video, options = {}) {
   const onForwardClick = () => {
     seekVideoBy(video, 10);
     syncTransportControls();
+  };
+
+  const onSeekPointerDown = () => {
+    isScrubbing = true;
+  };
+
+  const onSeekPointerUp = () => {
+    isScrubbing = false;
+    syncTransportControls();
+  };
+
+  const onSeekInput = () => {
+    const bounds = getSeekBounds(video);
+
+    if (!bounds) {
+      return;
+    }
+
+    video.currentTime = clamp(Number(seekRange.value), bounds.start, bounds.end);
+    timeLabel.textContent = `${formatTime(video.currentTime - bounds.start)} / ${formatTime(bounds.end - bounds.start)}`;
+  };
+
+  const onMuteClick = () => {
+    if (video.muted || video.volume === 0) {
+      video.muted = false;
+
+      if (video.volume === 0) {
+        video.volume = 0.5;
+      }
+    } else {
+      video.muted = true;
+    }
+
+    syncVolumeControls();
+  };
+
+  const onVolumeInput = () => {
+    const nextVolume = clamp(Number(volumeRange.value), 0, 1);
+    video.volume = nextVolume;
+    video.muted = nextVolume === 0;
+    syncVolumeControls();
   };
 
   const onCloseClick = () => stopBetterPicture();
@@ -716,6 +1058,28 @@ function createMiniPlayer(video, options = {}) {
     if (event.key === "ArrowRight") {
       event.preventDefault();
       onForwardClick();
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      video.muted = false;
+      video.volume = clamp(video.volume + 0.05, 0, 1);
+      syncVolumeControls();
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      video.volume = clamp(video.volume - 0.05, 0, 1);
+      video.muted = video.volume === 0;
+      syncVolumeControls();
+      return;
+    }
+
+    if (event.key.toLowerCase() === "m") {
+      event.preventDefault();
+      onMuteClick();
       return;
     }
 
@@ -803,6 +1167,12 @@ function createMiniPlayer(video, options = {}) {
   playButton.addEventListener("click", onPlayPauseClick);
   forwardButton.addEventListener("click", onForwardClick);
   closeButton.addEventListener("click", onCloseClick);
+  seekRange.addEventListener("pointerdown", onSeekPointerDown);
+  seekRange.addEventListener("pointerup", onSeekPointerUp);
+  seekRange.addEventListener("pointercancel", onSeekPointerUp);
+  seekRange.addEventListener("input", onSeekInput);
+  muteButton.addEventListener("click", onMuteClick);
+  volumeRange.addEventListener("input", onVolumeInput);
   hostDocument.addEventListener("keydown", onKeyDown);
 
   if (!isDocumentPip) {
@@ -816,11 +1186,13 @@ function createMiniPlayer(video, options = {}) {
     resizeHandle.addEventListener("pointercancel", onResizePointerUp);
   }
 
-  const syncEvents = ["play", "pause", "timeupdate", "seeked", "loadedmetadata", "durationchange"];
+  const syncEvents = ["play", "pause", "timeupdate", "seeked", "loadedmetadata", "durationchange", "progress"];
   syncEvents.forEach((eventName) => video.addEventListener(eventName, syncTransportControls));
+  video.addEventListener("volumechange", syncVolumeControls);
 
   const subtitleController = createSubtitleController(video, subtitleLayer);
   syncTransportControls();
+  syncVolumeControls();
 
   return {
     root,
@@ -832,11 +1204,19 @@ function createMiniPlayer(video, options = {}) {
     },
     cleanup() {
       subtitleController.cleanup();
+      videoFitController.cleanup();
       syncEvents.forEach((eventName) => video.removeEventListener(eventName, syncTransportControls));
+      video.removeEventListener("volumechange", syncVolumeControls);
       backButton.removeEventListener("click", onBackClick);
       playButton.removeEventListener("click", onPlayPauseClick);
       forwardButton.removeEventListener("click", onForwardClick);
       closeButton.removeEventListener("click", onCloseClick);
+      seekRange.removeEventListener("pointerdown", onSeekPointerDown);
+      seekRange.removeEventListener("pointerup", onSeekPointerUp);
+      seekRange.removeEventListener("pointercancel", onSeekPointerUp);
+      seekRange.removeEventListener("input", onSeekInput);
+      muteButton.removeEventListener("click", onMuteClick);
+      volumeRange.removeEventListener("input", onVolumeInput);
       hostDocument.removeEventListener("keydown", onKeyDown);
 
       if (!isDocumentPip) {
