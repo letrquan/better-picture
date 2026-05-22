@@ -48,6 +48,8 @@
   cursor: grab;
   user-select: none;
   touch-action: none;
+  opacity: 1;
+  transition: opacity 180ms ease, transform 180ms ease;
 }
 
 .better-picture-header:active {
@@ -220,6 +222,23 @@
   min-height: 48px;
   padding: 9px 10px 10px;
   background: linear-gradient(to top, rgba(8, 10, 15, 0.94), rgba(8, 10, 15, 0.44));
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.better-picture-player[data-controls-hidden="true"] .better-picture-header,
+.better-picture-player[data-controls-hidden="true"] .better-picture-controlbar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.better-picture-player[data-controls-hidden="true"] .better-picture-header {
+  transform: translateY(-8px);
+}
+
+.better-picture-player[data-controls-hidden="true"] .better-picture-controlbar {
+  transform: translateY(10px);
 }
 
 .better-picture-time {
@@ -317,6 +336,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .better-picture-button,
+  .better-picture-header,
+  .better-picture-controlbar,
   .better-picture-player {
     transition: none;
   }

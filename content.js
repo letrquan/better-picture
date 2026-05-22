@@ -16,6 +16,7 @@ const ROOT_ID = "better-picture-root";
 const MIN_PLAYER_WIDTH = 260;
 const MIN_PLAYER_HEIGHT = 160;
 const CAPTION_POLL_MS = 120;
+const CONTROLS_IDLE_MS = 1800;
 const YOUTUBE_CAPTION_SEGMENT_SELECTOR = ".ytp-caption-window-container .ytp-caption-segment";
 const YOUTUBE_CAPTION_SELECTOR = [
   ".ytp-caption-window-container .caption-window",
@@ -158,6 +159,8 @@ const DOCUMENT_PIP_STYLES = `
     padding: 8px;
     background: linear-gradient(to bottom, rgba(8, 10, 15, 0.72), rgba(8, 10, 15, 0));
     user-select: none;
+    opacity: 1;
+    transition: opacity 180ms ease, transform 180ms ease;
   }
 
   .better-picture-title {
@@ -325,6 +328,23 @@ const DOCUMENT_PIP_STYLES = `
     min-height: 48px;
     padding: 9px 10px 10px;
     background: linear-gradient(to top, rgba(8, 10, 15, 0.94), rgba(8, 10, 15, 0.44));
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .better-picture-player[data-controls-hidden="true"] .better-picture-header,
+  .better-picture-player[data-controls-hidden="true"] .better-picture-controlbar {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .better-picture-player[data-controls-hidden="true"] .better-picture-header {
+    transform: translateY(-8px);
+  }
+
+  .better-picture-player[data-controls-hidden="true"] .better-picture-controlbar {
+    transform: translateY(10px);
   }
 
   .better-picture-time {
@@ -379,7 +399,9 @@ const DOCUMENT_PIP_STYLES = `
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .better-picture-button {
+    .better-picture-button,
+    .better-picture-header,
+    .better-picture-controlbar {
       transition: none;
     }
   }
@@ -1024,6 +1046,39 @@ function createMiniPlayer(video, options = {}) {
   const dockController = dockSourceVideo(video, stage);
   const videoFitController = createVideoFitController(video, stage, hostWindow);
   let isScrubbing = false;
+  let controlsHideTimeout = 0;
+  let keyboardFocusWithin = false;
+
+  const clearControlsHideTimeout = () => {
+    if (controlsHideTimeout) {
+      hostWindow.clearTimeout(controlsHideTimeout);
+      controlsHideTimeout = 0;
+    }
+  };
+
+  const setControlsHidden = (hidden) => {
+    player.dataset.controlsHidden = hidden ? "true" : "false";
+  };
+
+  const scheduleControlsHide = () => {
+    clearControlsHideTimeout();
+
+    if (video.paused || isScrubbing || keyboardFocusWithin) {
+      setControlsHidden(false);
+      return;
+    }
+
+    controlsHideTimeout = hostWindow.setTimeout(() => {
+      if (!video.paused && !isScrubbing && !keyboardFocusWithin) {
+        setControlsHidden(true);
+      }
+    }, CONTROLS_IDLE_MS);
+  };
+
+  const showControls = () => {
+    setControlsHidden(false);
+    scheduleControlsHide();
+  };
 
   const syncTransportControls = () => {
     const bounds = getSeekBounds(video);
@@ -1070,37 +1125,45 @@ function createMiniPlayer(video, options = {}) {
     } else {
       video.pause();
     }
+
+    showControls();
   };
 
   const onBackClick = () => {
     seekVideoBy(video, -10);
     syncTransportControls();
+    showControls();
   };
 
   const onForwardClick = () => {
     seekVideoBy(video, 10);
     syncTransportControls();
+    showControls();
   };
 
   const onPreviousVideoClick = () => {
     if (triggerAdjacentVideo("previous")) {
       syncTransportControls();
     }
+    showControls();
   };
 
   const onNextVideoClick = () => {
     if (triggerAdjacentVideo("next")) {
       syncTransportControls();
     }
+    showControls();
   };
 
   const onSeekPointerDown = () => {
     isScrubbing = true;
+    showControls();
   };
 
   const onSeekPointerUp = () => {
     isScrubbing = false;
     syncTransportControls();
+    scheduleControlsHide();
   };
 
   const onSeekInput = () => {
@@ -1112,6 +1175,7 @@ function createMiniPlayer(video, options = {}) {
 
     video.currentTime = clamp(Number(seekRange.value), bounds.start, bounds.end);
     timeLabel.textContent = `${formatTime(video.currentTime - bounds.start)} / ${formatTime(bounds.end - bounds.start)}`;
+    showControls();
   };
 
   const onMuteClick = () => {
@@ -1126,6 +1190,7 @@ function createMiniPlayer(video, options = {}) {
     }
 
     syncVolumeControls();
+    showControls();
   };
 
   const onVolumeInput = () => {
@@ -1133,12 +1198,35 @@ function createMiniPlayer(video, options = {}) {
     video.volume = nextVolume;
     video.muted = nextVolume === 0;
     syncVolumeControls();
+    showControls();
   };
 
   const onCloseClick = () => stopBetterPicture();
 
+  const onPointerActivity = () => {
+    keyboardFocusWithin = false;
+    showControls();
+  };
+  const onFocusIn = () => setControlsHidden(false);
+  const onFocusOut = () => {
+    keyboardFocusWithin = false;
+    scheduleControlsHide();
+  };
+  const onVideoPlay = () => scheduleControlsHide();
+  const onVideoPause = () => {
+    clearControlsHideTimeout();
+    setControlsHidden(false);
+  };
+
   const onKeyDown = (event) => {
     if (isEditableTarget(event.target)) {
+      return;
+    }
+
+    if (event.key === "Tab") {
+      keyboardFocusWithin = true;
+      clearControlsHideTimeout();
+      setControlsHidden(false);
       return;
     }
 
@@ -1267,6 +1355,10 @@ function createMiniPlayer(video, options = {}) {
   previousButton.addEventListener("click", onPreviousVideoClick);
   nextButton.addEventListener("click", onNextVideoClick);
   closeButton.addEventListener("click", onCloseClick);
+  root.addEventListener("pointermove", onPointerActivity);
+  root.addEventListener("pointerenter", onPointerActivity);
+  root.addEventListener("focusin", onFocusIn);
+  root.addEventListener("focusout", onFocusOut);
   seekRange.addEventListener("pointerdown", onSeekPointerDown);
   seekRange.addEventListener("pointerup", onSeekPointerUp);
   seekRange.addEventListener("pointercancel", onSeekPointerUp);
@@ -1288,11 +1380,14 @@ function createMiniPlayer(video, options = {}) {
 
   const syncEvents = ["play", "pause", "timeupdate", "seeked", "loadedmetadata", "durationchange", "progress"];
   syncEvents.forEach((eventName) => video.addEventListener(eventName, syncTransportControls));
+  video.addEventListener("play", onVideoPlay);
+  video.addEventListener("pause", onVideoPause);
   video.addEventListener("volumechange", syncVolumeControls);
 
   const subtitleController = createSubtitleController(video, subtitleLayer);
   syncTransportControls();
   syncVolumeControls();
+  showControls();
 
   return {
     root,
@@ -1305,7 +1400,10 @@ function createMiniPlayer(video, options = {}) {
     cleanup() {
       subtitleController.cleanup();
       videoFitController.cleanup();
+      clearControlsHideTimeout();
       syncEvents.forEach((eventName) => video.removeEventListener(eventName, syncTransportControls));
+      video.removeEventListener("play", onVideoPlay);
+      video.removeEventListener("pause", onVideoPause);
       video.removeEventListener("volumechange", syncVolumeControls);
       backButton.removeEventListener("click", onBackClick);
       playButton.removeEventListener("click", onPlayPauseClick);
@@ -1313,6 +1411,10 @@ function createMiniPlayer(video, options = {}) {
       previousButton.removeEventListener("click", onPreviousVideoClick);
       nextButton.removeEventListener("click", onNextVideoClick);
       closeButton.removeEventListener("click", onCloseClick);
+      root.removeEventListener("pointermove", onPointerActivity);
+      root.removeEventListener("pointerenter", onPointerActivity);
+      root.removeEventListener("focusin", onFocusIn);
+      root.removeEventListener("focusout", onFocusOut);
       seekRange.removeEventListener("pointerdown", onSeekPointerDown);
       seekRange.removeEventListener("pointerup", onSeekPointerUp);
       seekRange.removeEventListener("pointercancel", onSeekPointerUp);
