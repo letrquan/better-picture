@@ -1,94 +1,134 @@
 # Better Picture
 
-Better Picture is a Chromium extension for Chrome and Microsoft Edge that mimics Picture-in-Picture with a custom floating mini-player. It is designed to keep subtitles visible when browser-native Picture-in-Picture does not include page captions.
+Better Picture is a Chromium extension for Chrome and Microsoft Edge. It creates a compact floating mini-player for the active page video, with subtitle support and focused controls for watching while you work in another window or tab.
 
-## Features
+The extension is built for sites where browser-native Picture-in-Picture is too limited, especially when captions disappear or when you want a small YouTube-style player with seek, volume, and skip controls.
 
-- Detects the best visible video on the current page.
-- Starts and stops from the extension toolbar popup.
-- Opens a Document Picture-in-Picture mini-player outside the browser window when supported.
-- Falls back to a draggable and resizable in-page mini-player when the browser blocks external PiP.
-- Temporarily docks the active page video into the mini-player so streaming sites such as YouTube do not need a duplicated media stream.
-- Renders subtitles from native HTML5 subtitle/caption tracks when available.
-- Falls back to visible-caption DOM scanning, including YouTube caption containers, when native tracks are not exposed.
-- Shows a clear message when captions cannot be detected.
+## What It Does
 
-## Install in Chrome or Edge
+- Finds the best visible video on the current page.
+- Opens an external Document Picture-in-Picture window when the browser supports it.
+- Falls back to a draggable, resizable in-page mini-player when external PiP is unavailable.
+- Moves the original page video into the mini-player instead of creating a second media stream.
+- Keeps the video responsive and contained when sites change source, size, or player styles.
+- Shows captions from native subtitle/caption tracks when available.
+- Falls back to visible caption text on the page, including YouTube caption containers.
+- Provides a clean icon toolbar with play/pause, seek, volume, 10-second jumps, previous video, and next video.
 
-1. Open the browser extensions page:
+## Install
+
+1. Open your browser extension page:
    - Chrome: `chrome://extensions`
    - Edge: `edge://extensions`
 2. Enable developer mode.
 3. Choose **Load unpacked**.
 4. Select this project folder.
-5. Pin **Better Picture** to the toolbar if you want quick access.
+5. Pin **Better Picture** to the toolbar for quick access.
 
-## Usage
+## Use
 
-1. Open a web page with a video.
-2. Turn on captions/subtitles in the page video player when the site requires it.
+1. Open a page with a video.
+2. Turn on captions/subtitles in the page player if you want captions.
 3. Click the **Better Picture** toolbar icon.
 4. Choose **Start mini-player**.
-5. Use the mini-player controls:
-   - **-10** jumps back 10 seconds.
-   - **Play/Pause** controls the active page video.
-   - **+10** jumps forward 10 seconds.
-   - **X** closes Better Picture.
-   - `ArrowLeft` and `ArrowRight` also jump back/forward 10 seconds while Better Picture is running.
-   - `Space` toggles play/pause while Better Picture is running.
-   - Drag the external Picture-in-Picture window outside the browser when Chrome or Edge opens it.
-   - When the page fallback is used, drag the header to move the mini-player and drag the bottom-right corner to resize it.
-   - Press `Escape` to close it.
+5. Use the floating player controls.
 
-## Subtitle support
+## Mini-Player Controls
 
-Better Picture tries subtitle sources in this order:
+The top-right button closes the mini-player. The bottom toolbar contains the active playback controls:
 
-1. Native `TextTrack` subtitles or captions from the selected `video` element.
+| Control | Action |
+| --- | --- |
+| Previous | Clicks the page's previous-video control when one is available. |
+| Back 10 | Jumps back 10 seconds. |
+| Play/Pause | Controls the active page video. |
+| Timeline | Drag to seek anywhere in the video. |
+| Time | Shows current time and duration. |
+| Forward 10 | Jumps forward 10 seconds. |
+| Next | Clicks the page's next-video control when one is available. |
+| Volume | Mute/unmute or adjust volume. |
+
+Keyboard shortcuts while Better Picture is running:
+
+| Shortcut | Action |
+| --- | --- |
+| `Space` | Play or pause. |
+| `ArrowLeft` | Back 10 seconds. |
+| `ArrowRight` | Forward 10 seconds. |
+| `ArrowUp` | Raise volume. |
+| `ArrowDown` | Lower volume. |
+| `M` | Mute or unmute. |
+| `Escape` | Close Better Picture. |
+
+When the page fallback player is used, drag the top overlay area to move it and drag the bottom-right corner to resize it.
+
+## Subtitle Support
+
+Better Picture checks subtitle sources in this order:
+
+1. Native `TextTrack` subtitles or captions on the selected `video` element.
 2. Visible caption text from likely caption containers on the page.
-3. A fallback unavailable message when no subtitle text can be detected.
+3. A clear unavailable message when no caption text can be detected.
 
-Some streaming sites use DRM, canvas rendering, closed shadow DOM, or private caption systems. Better Picture does not bypass those restrictions, so captions may not be available on every site.
+Some sites use DRM, canvas rendering, closed shadow DOM, or private caption systems. Better Picture does not bypass those restrictions, so captions are not guaranteed on every site.
 
-## Local demo
+## Previous and Next Video Support
 
-A lightweight demo is included in `demo/index.html` with local WebVTT captions in `demo/captions.vtt`.
+Previous and next are best-effort controls. Better Picture looks for clickable previous/next controls exposed by the page, including common YouTube player buttons. If no matching control is available, those buttons stay disabled.
+
+## Local Demo
+
+A lightweight demo is included in `demo/index.html` with WebVTT captions in `demo/captions.vtt`.
 
 To test it:
 
 1. Load the unpacked extension.
-2. Open `demo/index.html` in Chrome or Edge.
-3. Start playing the video.
-4. Open the Better Picture popup and click **Start mini-player**.
-5. Confirm that the floating mini-player appears and displays the demo captions.
-6. Try play/pause, drag, resize, close, and repeated start/stop actions.
+2. Start a local server from this folder:
+
+   ```powershell
+   python -m http.server 8765 --bind 127.0.0.1
+   ```
+
+3. Open `http://127.0.0.1:8765/demo/index.html`.
+4. Start the video.
+5. Open the Better Picture popup and click **Start mini-player**.
+6. Confirm the floating player opens, stays responsive, and shows the demo captions.
 
 The demo uses a public remote sample video from MDN and does not bundle copyrighted media.
 
-## Known limitations
+## Development Checks
 
-- Protected or site-managed videos may reject being moved into the custom mini-player.
-- Chrome or Edge may require a fresh user gesture before opening the external Picture-in-Picture window, in which case Better Picture falls back to the in-page mini-player.
-- Site-specific caption systems can prevent subtitle extraction.
-- The visible-caption fallback is intentionally conservative to avoid showing unrelated page text.
-- Browser extension pages, the Chrome Web Store, and some internal pages do not allow content scripts.
+Run these lightweight checks after editing:
 
-## Project structure
+```powershell
+node --check content.js
+node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest json ok')"
+```
+
+## Project Structure
 
 ```text
 better-picture/
-├── manifest.json
-├── popup.html
-├── popup.css
-├── popup.js
-├── content.js
-├── content.css
-├── background.js
-├── demo/
-│   ├── index.html
-│   └── captions.vtt
-└── icons/
-    ├── icon16.png
-    ├── icon48.png
-    └── icon128.png
+|-- manifest.json
+|-- popup.html
+|-- popup.css
+|-- popup.js
+|-- content.js
+|-- content.css
+|-- background.js
+|-- demo/
+|   |-- index.html
+|   `-- captions.vtt
+`-- icons/
+    |-- icon16.png
+    |-- icon48.png
+    `-- icon128.png
 ```
+
+## Known Limitations
+
+- Protected or site-managed videos may reject being moved into the custom mini-player.
+- Chrome or Edge may require a fresh user gesture before opening the external Picture-in-Picture window.
+- Site-specific caption systems can prevent subtitle extraction.
+- Previous and next controls depend on the page exposing clickable controls.
+- Browser extension pages, the Chrome Web Store, and some internal pages do not allow content scripts.

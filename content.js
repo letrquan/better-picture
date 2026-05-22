@@ -33,6 +33,23 @@ const CAPTION_SELECTOR = [
   ".vjs-text-track-display",
   ".jw-text-track-display"
 ].join(",");
+const ADJACENT_VIDEO_CONTROL_SELECTORS = {
+  previous: [
+    ".ytp-prev-button",
+    "button[aria-label*='Previous' i]",
+    "button[aria-label*='Prev' i]",
+    "button[title*='Previous' i]",
+    "button[title*='Prev' i]",
+    "[role='button'][aria-label*='Previous' i]",
+    "[role='button'][aria-label*='Prev' i]"
+  ],
+  next: [
+    ".ytp-next-button",
+    "button[aria-label*='Next' i]",
+    "button[title*='Next' i]",
+    "[role='button'][aria-label*='Next' i]"
+  ]
+};
 const UNAVAILABLE_SUBTITLE_MESSAGE = "No captions detected. Turn on subtitles in the video player if available.";
 const BUTTON_ICONS = {
   play: {
@@ -48,6 +65,18 @@ const BUTTON_ICONS = {
   close: {
     paths: [
       { d: "M6 6l12 12M18 6L6 18" }
+    ]
+  },
+  previous: {
+    paths: [
+      { d: "M6 5v14" },
+      { d: "M18 6l-9 6 9 6z", fill: "currentColor", stroke: "none" }
+    ]
+  },
+  next: {
+    paths: [
+      { d: "M18 5v14" },
+      { d: "M6 6l9 6-9 6z", fill: "currentColor", stroke: "none" }
     ]
   },
   rewind10: {
@@ -107,8 +136,9 @@ const DOCUMENT_PIP_STYLES = `
   }
 
   .better-picture-player {
+    position: relative;
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: 1fr;
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -116,25 +146,22 @@ const DOCUMENT_PIP_STYLES = `
   }
 
   .better-picture-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 10px;
-    min-height: 42px;
-    padding: 7px 8px 7px 12px;
-    border-bottom: 1px solid rgba(229, 231, 235, 0.12);
-    background: rgba(24, 27, 34, 0.96);
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 4;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    min-height: 48px;
+    padding: 8px;
+    background: linear-gradient(to bottom, rgba(8, 10, 15, 0.72), rgba(8, 10, 15, 0));
     user-select: none;
   }
 
   .better-picture-title {
-    overflow: hidden;
-    color: #f5f7fb;
-    font-size: 12px;
-    font-weight: 820;
-    line-height: 1.15;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
   }
 
   .better-picture-controls {
@@ -292,16 +319,16 @@ const DOCUMENT_PIP_STYLES = `
     left: 0;
     z-index: 3;
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) auto auto auto minmax(58px, 84px);
+    grid-template-columns: auto auto auto minmax(46px, 1fr) auto auto auto auto minmax(44px, 64px);
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-height: 48px;
     padding: 9px 10px 10px;
     background: linear-gradient(to top, rgba(8, 10, 15, 0.94), rgba(8, 10, 15, 0.44));
   }
 
   .better-picture-time {
-    min-width: 70px;
+    min-width: 64px;
     color: #e5e7eb;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
@@ -324,20 +351,25 @@ const DOCUMENT_PIP_STYLES = `
   }
 
   .better-picture-button--compact {
-    width: 32px;
+    width: 30px;
     height: 30px;
-    min-width: 32px;
+    min-width: 30px;
     min-height: 30px;
   }
 
   .better-picture-volume {
-    width: 84px;
+    width: 64px;
   }
 
-  @media (max-width: 360px) {
+  @media (max-width: 380px) {
     .better-picture-controlbar {
-      grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+      grid-template-columns: auto auto auto minmax(42px, 1fr) auto auto auto;
       gap: 6px;
+    }
+
+    .better-picture-time {
+      min-width: 54px;
+      font-size: 10px;
     }
 
     .better-picture-button--mute,
@@ -782,6 +814,48 @@ function seekVideoBy(video, seconds) {
   return true;
 }
 
+function isUsableAdjacentVideoControl(element) {
+  if (!element || element.closest(`#${ROOT_ID}`)) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  const style = window.getComputedStyle(element);
+
+  return rect.width > 0 &&
+    rect.height > 0 &&
+    style.display !== "none" &&
+    style.visibility !== "hidden" &&
+    Number(style.opacity) !== 0 &&
+    !element.disabled &&
+    element.getAttribute("aria-disabled") !== "true";
+}
+
+function findAdjacentVideoControl(direction) {
+  const selectors = ADJACENT_VIDEO_CONTROL_SELECTORS[direction] || [];
+
+  for (const selector of selectors) {
+    const control = Array.from(document.querySelectorAll(selector)).find(isUsableAdjacentVideoControl);
+
+    if (control) {
+      return control;
+    }
+  }
+
+  return null;
+}
+
+function triggerAdjacentVideo(direction) {
+  const control = findAdjacentVideoControl(direction);
+
+  if (!control) {
+    return false;
+  }
+
+  control.click();
+  return true;
+}
+
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return "--:--";
@@ -859,10 +933,15 @@ function createMiniPlayer(video, options = {}) {
 
   const title = hostDocument.createElement("div");
   title.className = "better-picture-title";
-  title.textContent = isDocumentPip ? "Better Picture - External" : "Better Picture";
+  title.textContent = "";
 
   const controls = hostDocument.createElement("div");
   controls.className = "better-picture-controls";
+
+  const previousButton = hostDocument.createElement("button");
+  previousButton.className = "better-picture-button better-picture-button--compact better-picture-button--adjacent";
+  previousButton.type = "button";
+  setButtonIcon(previousButton, "previous", "Previous video");
 
   const backButton = hostDocument.createElement("button");
   backButton.className = "better-picture-button better-picture-button--compact better-picture-button--seek";
@@ -877,6 +956,11 @@ function createMiniPlayer(video, options = {}) {
   forwardButton.className = "better-picture-button better-picture-button--compact better-picture-button--seek";
   forwardButton.type = "button";
   setButtonIcon(forwardButton, "forward10", "Forward 10 seconds");
+
+  const nextButton = hostDocument.createElement("button");
+  nextButton.className = "better-picture-button better-picture-button--compact better-picture-button--adjacent";
+  nextButton.type = "button";
+  setButtonIcon(nextButton, "next", "Next video");
 
   const closeButton = hostDocument.createElement("button");
   closeButton.className = "better-picture-button";
@@ -925,8 +1009,8 @@ function createMiniPlayer(video, options = {}) {
   resizeHandle.setAttribute("aria-hidden", "true");
 
   controls.append(closeButton);
-  header.append(title, controls);
-  controlBar.append(backButton, playButton, seekRange, timeLabel, forwardButton, muteButton, volumeRange);
+  header.append(controls);
+  controlBar.append(previousButton, backButton, playButton, seekRange, timeLabel, forwardButton, nextButton, muteButton, volumeRange);
   stage.append(subtitleLayer, controlBar);
   player.append(header, stage);
 
@@ -950,6 +1034,8 @@ function createMiniPlayer(video, options = {}) {
     forwardButton.disabled = !canSeek || video.currentTime >= bounds.end - 0.25;
 
     seekRange.disabled = !canSeek;
+    previousButton.disabled = !findAdjacentVideoControl("previous");
+    nextButton.disabled = !findAdjacentVideoControl("next");
 
     if (canSeek) {
       seekRange.min = String(bounds.start);
@@ -994,6 +1080,18 @@ function createMiniPlayer(video, options = {}) {
   const onForwardClick = () => {
     seekVideoBy(video, 10);
     syncTransportControls();
+  };
+
+  const onPreviousVideoClick = () => {
+    if (triggerAdjacentVideo("previous")) {
+      syncTransportControls();
+    }
+  };
+
+  const onNextVideoClick = () => {
+    if (triggerAdjacentVideo("next")) {
+      syncTransportControls();
+    }
   };
 
   const onSeekPointerDown = () => {
@@ -1166,6 +1264,8 @@ function createMiniPlayer(video, options = {}) {
   backButton.addEventListener("click", onBackClick);
   playButton.addEventListener("click", onPlayPauseClick);
   forwardButton.addEventListener("click", onForwardClick);
+  previousButton.addEventListener("click", onPreviousVideoClick);
+  nextButton.addEventListener("click", onNextVideoClick);
   closeButton.addEventListener("click", onCloseClick);
   seekRange.addEventListener("pointerdown", onSeekPointerDown);
   seekRange.addEventListener("pointerup", onSeekPointerUp);
@@ -1210,6 +1310,8 @@ function createMiniPlayer(video, options = {}) {
       backButton.removeEventListener("click", onBackClick);
       playButton.removeEventListener("click", onPlayPauseClick);
       forwardButton.removeEventListener("click", onForwardClick);
+      previousButton.removeEventListener("click", onPreviousVideoClick);
+      nextButton.removeEventListener("click", onNextVideoClick);
       closeButton.removeEventListener("click", onCloseClick);
       seekRange.removeEventListener("pointerdown", onSeekPointerDown);
       seekRange.removeEventListener("pointerup", onSeekPointerUp);

@@ -22,7 +22,7 @@
 .better-picture-player {
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: 1fr;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -34,14 +34,17 @@
 }
 
 .better-picture-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 7px 8px 7px 12px;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.12);
-  background: rgba(24, 27, 34, 0.96);
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  min-height: 48px;
+  padding: 8px;
+  background: linear-gradient(to bottom, rgba(8, 10, 15, 0.72), rgba(8, 10, 15, 0));
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -52,14 +55,7 @@
 }
 
 .better-picture-title {
-  overflow: hidden;
-  color: #f5f7fb;
-  font-size: 12px;
-  font-weight: 820;
-  letter-spacing: 0;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none;
 }
 
 .better-picture-controls {
@@ -218,16 +214,16 @@
   left: 0;
   z-index: 3;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto minmax(58px, 84px);
+  grid-template-columns: auto auto auto minmax(46px, 1fr) auto auto auto auto minmax(44px, 64px);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-height: 48px;
   padding: 9px 10px 10px;
   background: linear-gradient(to top, rgba(8, 10, 15, 0.94), rgba(8, 10, 15, 0.44));
 }
 
 .better-picture-time {
-  min-width: 70px;
+  min-width: 64px;
   color: #e5e7eb;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -251,14 +247,14 @@
 }
 
 .better-picture-button--compact {
-  width: 32px;
+  width: 30px;
   height: 30px;
-  min-width: 32px;
+  min-width: 30px;
   min-height: 30px;
 }
 
 .better-picture-volume {
-  width: 84px;
+  width: 64px;
 }
 
 .better-picture-resize {
@@ -291,10 +287,15 @@
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 380px) {
   .better-picture-controlbar {
-    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto auto auto minmax(42px, 1fr) auto auto auto;
     gap: 6px;
+  }
+
+  .better-picture-time {
+    min-width: 54px;
+    font-size: 10px;
   }
 
   .better-picture-button--mute,
