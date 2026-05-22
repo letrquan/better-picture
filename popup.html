@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Better Picture</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="popup" aria-labelledby="popup-title">
+    <header class="popup__header">
+      <div class="popup__mark" aria-hidden="true">BP</div>
+      <div>
+        <h1 id="popup-title">Better Picture</h1>
+        <p class="popup__tagline">Caption-aware Picture-in-Picture</p>
+      </div>
+    </header>
+
+    <section class="popup__panel" aria-label="Current state">
+      <p id="status" class="popup__status" role="status" aria-live="polite" data-state="checking">Checking this page...</p>
+      <dl class="popup__meta">
+        <div>
+          <dt>Mode</dt>
+          <dd id="modeValue">Checking</dd>
+        </div>
+        <div>
+          <dt>Captions</dt>
+          <dd id="captionValue">Checking</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div class="popup__actions" aria-label="Better Picture controls">
+      <button id="startButton" class="popup__button popup__button--primary" type="button">Start</button>
+      <button id="stopButton" class="popup__button" type="button">Stop</button>
+    </div>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

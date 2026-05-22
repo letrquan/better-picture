@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Better Picture Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 18px;
+      background: #0b0d12;
+      box-shadow: 0 24px 70px rgba(2, 6, 23, 0.45);
+    }
+
+    .note {
+      margin-top: 18px;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+
+    code {
+      color: #bfdbfe;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Better Picture Demo</h1>
+    <video controls crossorigin="anonymous" poster="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.jpg">
+      <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4">
+      <track src="captions.vtt" kind="subtitles" srclang="en" label="English" default>
+      Your browser does not support the video element.
+    </video>
+    <p class="note">Load the unpacked extension, open this page, then use the Better Picture toolbar popup. The mini-player should open externally when supported, dock the video, and render the local <code>captions.vtt</code> text.</p>
+  </main>
+</body>
+</html>
