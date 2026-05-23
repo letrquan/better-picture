@@ -1,21 +1,49 @@
+/* ── Zero-Abstraction Matrix brutalist design tokens ──────── */
+
 :root {
   color-scheme: dark;
-  --bg: #111318;
-  --panel: #181b22;
-  --panel-strong: #20242d;
-  --line: rgba(229, 231, 235, 0.12);
-  --text: #f5f7fb;
-  --muted: #aeb6c4;
-  --subtle: #768295;
-  --accent: #3b82f6;
-  --accent-strong: #2563eb;
-  --ok: #34d399;
-  --warn: #fbbf24;
-  --danger: #fb7185;
-  --radius: 14px;
+
+  /* Color Palette Specs */
+  --bg: #050505;                       /* Absolute Void Black */
+  --bg-elevated: #1a1a1a;              /* Graphite Gray */
+  --panel: #050505;                    /* Raw Layer Base */
+  --panel-strong: #1a1a1a;             /* Layer Level 1 */
+  --panel-hover: #262626;              /* Hover Active layer */
+
+  /* Mathematical Hard Outlines */
+  --line: #1a1a1a;                     /* Dark Slate outline */
+  --line-strong: #666666;              /* Muted Gray outline */
+
+  /* System Typography Colors */
+  --text: #fafaf5;                     /* Terminal White */
+  --text-secondary: #e5e2e1;           /* Raw Light Gray */
+  --text-muted: #666666;               /* Graphite Gray Muted */
+  --text-subtle: #353534;              /* Deep Muted */
+
+  /* Tensor Accents */
+  --accent: #ffb800;                   /* Tensor Amber */
+  --accent-strong: #ffb800;
+  --accent-soft: rgba(255, 184, 0, 0.1);
+  --accent-glow: rgba(255, 184, 0, 0.2);
+
+  --ok: #00ff41;                       /* Matrix Green (Active compile / go state) */
+  --ok-glow: rgba(0, 255, 65, 0.25);
+  --warn: #ffb800;                     /* Amber strobe warning */
+  --danger: #ffb4ab;                   /* Tensor Error Red */
+
+  /* Strict Zero-Abstraction (0px) Curves */
+  --radius-sm: 0px;
+  --radius: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  /* Typography Stacks */
+  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
   background: var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
 }
 
 * {
@@ -27,19 +55,32 @@ body {
   min-width: 320px;
   margin: 0;
   background: var(--bg);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ── Popup Base Layout ────────────────────────────────────── */
 
 .popup {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   padding: 16px;
 }
+
+.popup__divider {
+  border: 0;
+  height: 1px;
+  background: var(--line-strong);
+  margin: 2px 0;
+}
+
+/* ── Brutalist Technical Header ───────────────────────────── */
 
 .popup__header {
   display: grid;
   grid-template-columns: 42px 1fr;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -48,74 +89,201 @@ body {
   place-items: center;
   width: 42px;
   height: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 13px;
-  background: #20242d;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 24px rgba(0, 0, 0, 0.22);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 850;
-  letter-spacing: 0.08em;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line-strong);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
-h1,
-p,
-dl,
-dd {
+.popup__header-text {
+  display: grid;
+  gap: 1px;
+}
+
+h1, h2, p, dl, dd, ul {
   margin: 0;
 }
 
 h1 {
-  overflow: hidden;
-  font-size: 17px;
+  font-family: var(--font-mono);
+  font-size: 16px;
   font-weight: 800;
-  letter-spacing: 0;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--text);
 }
 
 .popup__tagline {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.2;
 }
+
+/* ── Active Controller Card (Zero-Abstraction Widget) ─────── */
+
+.popup__section {
+  display: grid;
+  gap: 8px;
+}
+
+.popup__section--main {
+  border: 1px solid var(--line-strong);
+  padding: 12px;
+  background: var(--bg);
+}
+
+.popup__control-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 18px;
+}
+
+.popup__source-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.popup__reset-button {
+  border: 1px solid var(--line-strong);
+  background: var(--panel-strong);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.popup__reset-button:hover {
+  background: var(--panel-hover);
+  border-color: var(--accent);
+}
+
+.popup__reset-button:active {
+  transform: translateY(1px);
+}
+
+/* ── Sharp Technical Tab Card ─────────────────────────────── */
+
+.popup__selected-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.popup__favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.popup__favicon-fallback {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.popup__favicon-fallback svg {
+  width: 11px;
+  height: 11px;
+}
+
+.popup__selected-info {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.popup__selected-title {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.popup__selected-domain {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+/* ── Panel status area ────────────────────────────────────── */
 
 .popup__panel {
   display: grid;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(24, 27, 34, 0.92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  gap: 8px;
+}
+
+.popup__status-row {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
 }
 
 .popup__status {
   position: relative;
-  min-height: 38px;
-  padding-left: 16px;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 650;
-  line-height: 1.45;
+  padding-left: 14px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-transform: uppercase;
 }
 
 .popup__status::before {
   position: absolute;
-  top: 7px;
+  top: 5px;
   left: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--subtle);
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;              /* Circular indicator exception */
+  background: var(--text-subtle);
   content: "";
 }
 
-.popup__status[data-state="ready"]::before,
+.popup__status[data-state="ready"]::before {
+  background: var(--ok);
+  box-shadow: 0 0 4px var(--ok-glow);
+}
+
 .popup__status[data-state="running"]::before {
   background: var(--ok);
+  box-shadow: 0 0 5px var(--ok-glow);
+  animation: pulseGlow 1.5s ease-in-out infinite;
 }
 
 .popup__status[data-state="checking"]::before {
@@ -124,97 +292,324 @@ h1 {
 
 .popup__status[data-state="error"]::before {
   background: var(--danger);
+  animation: flashRed 1s steps(2) infinite;
 }
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes flashRed {
+  from { background: var(--danger); }
+  to { background: transparent; }
+}
+
+/* ── Monospace Grid Metadata Badges ───────────────────────── */
 
 .popup__meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 
 .popup__meta > div {
   min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
   background: var(--panel-strong);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
 }
 
 dt {
-  margin-bottom: 4px;
-  color: var(--subtle);
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
   line-height: 1;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 dd {
   overflow: hidden;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 760;
-  line-height: 1.2;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* ── Brutalist Sharp Capsule-less Action Buttons ─────────── */
+
 .popup__actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 92px;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .popup__button {
-  min-height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 0 14px;
-  background: var(--panel-strong);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 780;
+  min-height: 36px;
+  border-radius: var(--radius-sm);    /* Strictly 0px sharp corners */
+  padding: 0 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, opacity 140ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
 }
 
 .popup__button--primary {
-  border-color: rgba(96, 165, 250, 0.4);
-  background: var(--accent-strong);
+  background: var(--accent);          /* Tensor Amber fill */
+  color: var(--bg);                   /* Void Black text */
+  border: 2px solid var(--accent);
+}
+
+.popup__button--secondary {
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--line-strong); /* Muted Gray border */
 }
 
 .popup__button:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: #2a303b;
+  opacity: 0.95;
 }
 
 .popup__button--primary:hover:not(:disabled) {
-  background: var(--accent);
+  background: #e6a500;
+  border-color: #e6a500;
+}
+
+.popup__button--secondary:hover:not(:disabled) {
+  border-color: var(--text);          /* turns terminal-white on hover */
+  color: var(--text);
 }
 
 .popup__button:active:not(:disabled) {
-  transform: translateY(1px) scale(0.99);
-}
-
-.popup__button:focus-visible {
-  outline: 3px solid rgba(96, 165, 250, 0.65);
-  outline-offset: 2px;
+  transform: translateY(1px);
 }
 
 .popup__button:disabled {
   cursor: not-allowed;
-  opacity: 0.46;
+  opacity: 0.35;
 }
 
-.popup__button--primary:disabled {
-  border-color: var(--line);
+/* ── Other sources Grid Section ────────────────────────────── */
+
+.popup__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.popup__section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.popup__icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.popup__icon-button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
   background: var(--panel-strong);
 }
 
+.popup__icon-button:active {
+  transform: translateY(1px);
+}
+
+.popup__icon-button--spinning svg {
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.popup__icon-svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── Scan Status Prompts ──────────────────────────────────── */
+
+.popup__scan-status {
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  border: 1px dashed var(--line-strong);
+  background: var(--panel);
+}
+
+.popup__scan-status:empty {
+  display: none;
+}
+
+.popup__scan-status[data-state="empty"] {
+  border: 0;
+  padding: 2px 0;
+  text-align: left;
+  font-style: italic;
+  background: transparent;
+}
+
+/* ── Tab Picker list ──────────────────────────────────────── */
+
+.popup__tab-list {
+  display: grid;
+  gap: 4px;
+  max-height: 120px;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.popup__tab-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.popup__tab-list::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.popup__tab-list:empty {
+  display: none;
+}
+
+/* ── Wifi/AirPlay Brutalist Row ───────────────────────────── */
+
+.popup__tab-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease;
+  min-height: 36px;
+}
+
+.popup__tab-item:hover {
+  background: var(--panel-hover);
+  border-color: var(--line-strong);
+}
+
+.popup__tab-item:active {
+  transform: translateY(1px);
+}
+
+.popup__tab-item--running {
+  border-color: var(--accent);
+}
+
+/* ── Info & Indicators inside List ────────────────────────── */
+
+.popup__tab-info {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.popup__tab-title {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.popup__tab-domain {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.popup__tab-indicator {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.popup__running-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;              /* Circular indicator exception */
+  background: var(--ok);
+  box-shadow: 0 0 3px var(--ok-glow);
+  animation: pulseGlow 1.5s ease-in-out infinite;
+}
+
+/* ── Reduced Motion ───────────────────────────────────────── */
+
 @media (prefers-reduced-motion: reduce) {
-  .popup__button {
+  .popup__button,
+  .popup__icon-button,
+  .popup__tab-item,
+  .popup__status::before {
     transition: none;
+  }
+
+  .popup__running-dot {
+    animation: none;
+  }
+
+  .popup__status[data-state="running"]::before {
+    animation: none;
+  }
+
+  .popup__icon-button--spinning svg {
+    animation: none;
   }
 }

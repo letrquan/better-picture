@@ -48,15 +48,22 @@ The popup and content script communicate through shared message type strings:
 - `BETTER_PICTURE_START`
 - `BETTER_PICTURE_STOP`
 - `BETTER_PICTURE_STATUS_REQUEST`
+- `BETTER_PICTURE_SCAN_TABS`
 
-Keep these strings in sync between `popup.js` and `content.js`; there is no shared module system.
+`BETTER_PICTURE_SCAN_TABS` is handled by the background service worker, not the content script.
+
+Keep these strings in sync between `popup.js`, `content.js`, and `background.js`; there is no shared module system.
 
 Popup flow:
 
-1. `popup.js` queries the active tab.
-2. It sends a status/start/stop message to the content script.
-3. If Chrome reports a missing receiver, it injects `content.css` and `content.js` using `chrome.scripting`, then retries the message.
-4. It renders the returned status into the popup controls and metadata.
+1. On open, `popup.js` sends a `BETTER_PICTURE_SCAN_TABS` message to the background service worker.
+2. The background worker queries all `http`/`https` tabs for video status by sending `BETTER_PICTURE_STATUS_REQUEST` to each and collecting responses.
+3. The popup renders a tab picker view showing every tab with a detected video.
+4. If only one tab has video, the popup auto-selects it and skips the picker.
+5. Once the user selects a tab, the popup switches to a status/controls view for that specific tab.
+6. Start/stop messages target the selected tab, not necessarily the currently active tab.
+7. If Chrome reports a missing receiver, the popup injects `content.css` and `content.js` using `chrome.scripting`, then retries the message.
+8. A "Back" button returns the user to the tab picker view and re-scans all tabs.
 
 Content script flow:
 
@@ -105,7 +112,7 @@ Previous/next controls are best effort. `content.js` searches for exposed clicka
 
 JavaScript uses plain browser APIs, `const`/`let`, async functions where needed, optional chaining, and two-space indentation. Functions are small and named for behavior (`findBestVideo`, `createMiniPlayer`, `syncTransportControls`).
 
-CSS uses the `better-picture-` prefix for injected player classes and `popup__` BEM-style classes for popup UI. Keep injected-page CSS scoped to `#better-picture-root` or prefixed classes.
+CSS uses the `better-picture-` prefix for injected player classes and `popup__` BEM-style classes for popup UI. Keep injected-page CSS scoped to `#better-picture-root` or prefixed classes. The popup uses Inter font loaded from Google Fonts via a `<link>` tag in `popup.html`.
 
 Accessibility patterns already present include `aria-label`, `aria-live`, native buttons, focus-visible outlines, keyboard shortcuts, and reduced-motion media queries. Preserve these patterns for new controls.
 
@@ -126,7 +133,8 @@ For CSS or control-layout changes, verify both Document Picture-in-Picture and i
 ## Non-Obvious Constraints
 
 - No dependencies are installed or declared. Do not add package-manager workflows unless explicitly requested.
-- `manifest.json` currently asks only for `activeTab` and `scripting`; avoid adding broader permissions without a clear need.
+- `manifest.json` now requests `tabs`, `activeTab`, and `scripting` permissions. The `tabs` permission enables cross-tab video scanning from the popup and background worker.
+- The popup loads Inter font from Google Fonts via a `<link>` tag; this external resource requires network access from the popup page.
 - `content_scripts.matches` is `<all_urls>`, so content-side code must tolerate arbitrary pages and missing/hostile media structures.
 - Browser extension pages, Chrome Web Store pages, and browser internal pages will not accept content scripts; popup error handling should remain graceful.
 - Some sites may reject moving protected/site-managed videos or hide captions in closed shadow DOM/canvas/private systems. The extension does not bypass those restrictions.

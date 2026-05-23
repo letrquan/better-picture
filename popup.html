@@ -3,37 +3,89 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Better Picture</title>
+  <title>Better Picture [Telemetry]</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <main class="popup" aria-labelledby="popup-title">
+    <!-- Matrix Technical Header -->
     <header class="popup__header">
       <div class="popup__mark" aria-hidden="true">BP</div>
-      <div>
-        <h1 id="popup-title">Better Picture</h1>
-        <p class="popup__tagline">Caption-aware Picture-in-Picture</p>
+      <div class="popup__header-text">
+        <h1 id="popup-title">BETTER_PICTURE</h1>
+        <p class="popup__tagline">LOCAL PIP TELEMETRY V0.1.0</p>
       </div>
     </header>
 
-    <section class="popup__panel" aria-label="Current state">
-      <p id="status" class="popup__status" role="status" aria-live="polite" data-state="checking">Checking this page...</p>
-      <dl class="popup__meta">
-        <div>
-          <dt>Mode</dt>
-          <dd id="modeValue">Checking</dd>
+    <!-- Main Controller Card (Zero-Abstraction Matrix) -->
+    <section class="popup__section popup__section--main" aria-label="Active control card">
+      <div class="popup__control-header">
+        <span id="controlSourceLabel" class="popup__source-label">> CONTROL_TARGET</span>
+        <button id="resetToActiveButton" class="popup__reset-button" type="button" hidden>
+          [RESET]
+        </button>
+      </div>
+
+      <!-- Tab Details Card -->
+      <div class="popup__selected-tab">
+        <img id="selectedFavicon" class="popup__favicon" src="" alt="" width="16" height="16" style="display: none;">
+        <div id="selectedFaviconFallback" class="popup__favicon-fallback" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
         </div>
-        <div>
-          <dt>Captions</dt>
-          <dd id="captionValue">Checking</dd>
+        <div class="popup__selected-info">
+          <div id="selectedTitle" class="popup__selected-title">INITIALIZING...</div>
+          <div id="selectedDomain" class="popup__selected-domain">NULL_STREAM</div>
         </div>
-      </dl>
+      </div>
+
+      <!-- State & Badges -->
+      <div class="popup__panel">
+        <div class="popup__status-row">
+          <span id="status" class="popup__status" role="status" aria-live="polite" data-state="checking">CONNECTING...</span>
+        </div>
+        <dl class="popup__meta">
+          <div>
+            <dt>MODE</dt>
+            <dd id="modeValue">NULL</dd>
+          </div>
+          <div>
+            <dt>CAPS</dt>
+            <dd id="captionValue">NULL</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Start/Stop Actions (Sharp Capsule-less Buttons) -->
+      <div class="popup__actions" aria-label="Better Picture controls">
+        <button id="startButton" class="popup__button popup__button--primary" type="button">START</button>
+        <button id="stopButton" class="popup__button popup__button--secondary" type="button">STOP</button>
+      </div>
     </section>
 
-    <div class="popup__actions" aria-label="Better Picture controls">
-      <button id="startButton" class="popup__button popup__button--primary" type="button">Start</button>
-      <button id="stopButton" class="popup__button" type="button">Stop</button>
-    </div>
+    <!-- Technical Outlined Divider -->
+    <hr class="popup__divider">
+
+    <!-- Other Video Sources Section (Grid list) -->
+    <section class="popup__section popup__section--other" aria-label="Other video sources">
+      <div class="popup__section-header">
+        <h2 class="popup__section-title">> TARGETABLE_DEVICES</h2>
+        <button id="refreshButton" class="popup__icon-button" type="button" aria-label="Rescan tabs" title="Scan tabs">
+          <svg class="popup__icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 2v6h-6"/>
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+            <path d="M3 22v-6h6"/>
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+          </svg>
+        </button>
+      </div>
+      <p id="scanStatus" class="popup__scan-status" role="status" aria-live="polite">SCANNING MATRIX...</p>
+      <ul id="tabList" class="popup__tab-list" role="listbox" aria-label="Other tabs with video"></ul>
+    </section>
   </main>
   <script src="popup.js"></script>
 </body>

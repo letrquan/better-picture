@@ -1538,7 +1538,8 @@ function getStatus() {
     hasVideo: Boolean(video),
     isRunning: Boolean(betterPicture),
     displayMode: betterPicture?.displayMode || "none",
-    subtitleMode
+    subtitleMode,
+    pageTitle: document.title
   };
 }
 
