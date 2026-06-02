@@ -18,6 +18,7 @@
   "permissions": [
     "activeTab",
     "scripting",
+    "storage",
     "tabs"
   ],
   "host_permissions": [
@@ -29,6 +30,12 @@
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["youtube-player-bridge.js"],
+      "matches": ["https://www.youtube.com/*", "https://youtube.com/*"]
     }
   ]
 }

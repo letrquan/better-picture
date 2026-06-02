@@ -5,10 +5,65 @@ if (globalThis.__BETTER_PICTURE_CONTENT_LOADED__) {
 
 globalThis.__BETTER_PICTURE_CONTENT_LOADED__ = true;
 
+// ── Auto-Restart Detection (after page navigation) ─────────
+(async () => {
+  try {
+    const result = await chrome.runtime.sendMessage({
+      type: "BETTER_PICTURE_YOUTUBE_SEARCH",
+      action: "getAndClearAutostart"
+    });
+    if (result?.url && Date.now() - (result.timestamp || 0) < 30000) {
+      setTimeout(() => {
+        if (!betterPicture) {
+          startBetterPicture();
+        }
+      }, 1500);
+    }
+  } catch { /* storage not available */ }
+})();
+
+// ── YouTube SPA Navigation Listener ────────────────────────
+const onYouTubeNavigation = () => {
+  if (!betterPicture) return;
+
+  const waitForVideo = (attempts = 0) => {
+    if (attempts > 20) return;
+
+    const newVideo = findBestVideo();
+    if (newVideo && newVideo !== betterPicture.video && isFiniteDuration(newVideo)) {
+      betterPicture.cleanup();
+      betterPicture = null;
+      setTimeout(() => {
+        if (!betterPicture) {
+          startBetterPicture();
+        }
+      }, 500);
+    } else {
+      setTimeout(() => waitForVideo(attempts + 1), 300);
+    }
+  };
+  waitForVideo();
+};
+
+window.addEventListener("yt-navigate-finish", onYouTubeNavigation);
+window.addEventListener("popstate", onYouTubeNavigation);
+
+const videoObserver = new MutationObserver(() => {
+  if (betterPicture && isYouTubePage()) {
+    const newVideo = findBestVideo();
+    if (newVideo && newVideo !== betterPicture.video && isFiniteDuration(newVideo)) {
+      onYouTubeNavigation();
+    }
+  }
+});
+videoObserver.observe(document.body, { childList: true, subtree: true });
+
 const BETTER_PICTURE_MESSAGE_TYPES = {
   START: "BETTER_PICTURE_START",
   STOP: "BETTER_PICTURE_STOP",
-  STATUS_REQUEST: "BETTER_PICTURE_STATUS_REQUEST"
+  STATUS_REQUEST: "BETTER_PICTURE_STATUS_REQUEST",
+  YOUTUBE_SEARCH: "BETTER_PICTURE_YOUTUBE_SEARCH",
+  NAVIGATE: "BETTER_PICTURE_NAVIGATE"
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -52,6 +107,7 @@ const ADJACENT_VIDEO_CONTROL_SELECTORS = {
   ]
 };
 const UNAVAILABLE_SUBTITLE_MESSAGE = "No captions detected. Turn on subtitles in the video player if available.";
+const YOUTUBE_MINIPLAYER_SEARCH_LIMIT = 20;
 const BUTTON_ICONS = {
   play: {
     paths: [
@@ -104,6 +160,12 @@ const BUTTON_ICONS = {
     paths: [
       { d: "M4 10v4h4l5 4V6l-5 4H4z", fill: "currentColor", stroke: "none" },
       { d: "M17 9l4 6M21 9l-4 6" }
+    ]
+  },
+  search: {
+    paths: [
+      { d: "M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z" },
+      { d: "M21 21l-4.35-4.35" }
     ]
   }
 };
@@ -381,6 +443,164 @@ const DOCUMENT_PIP_STYLES = `
     width: 64px;
   }
 
+  .better-picture-search {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    background: #111318;
+    min-height: 0;
+  }
+
+  .better-picture-search[hidden] {
+    display: none;
+  }
+
+  .better-picture-search__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.12);
+    min-height: 42px;
+    flex-shrink: 0;
+  }
+
+  .better-picture-search__title {
+    color: #f5f7fb;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .better-picture-search__form {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.08);
+    flex-shrink: 0;
+  }
+
+  .better-picture-search__input {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    border: 1px solid rgba(229, 231, 235, 0.18);
+    border-radius: 8px;
+    padding: 0 12px;
+    background: #20242d;
+    color: #f5f7fb;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+  }
+
+  .better-picture-search__input:focus {
+    border-color: rgba(96, 165, 250, 0.68);
+  }
+
+  .better-picture-search__input::placeholder {
+    color: #8b95a5;
+  }
+
+  .better-picture-button--search-go {
+    width: auto;
+    min-width: 42px;
+    padding: 0 14px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .better-picture-search__results {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .better-picture-search__choice {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #20242d;
+    cursor: pointer;
+    min-height: 36px;
+  }
+
+  .better-picture-search__choice:hover,
+  .better-picture-search__choice:focus-visible {
+    background: #2a303b;
+    outline: 2px solid rgba(96, 165, 250, 0.68);
+    outline-offset: 1px;
+  }
+
+  .better-picture-search__choice--with-thumb {
+    grid-template-columns: 72px 1fr;
+    gap: 8px;
+    min-height: 56px;
+    align-items: start;
+  }
+
+  .better-picture-search__thumb {
+    width: 72px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #16181e;
+  }
+
+  .better-picture-search__choice-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .better-picture-search__choice-title {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    color: #e5e7eb;
+  }
+
+  .better-picture-search__choice-channel {
+    overflow: hidden;
+    font-size: 10px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #8b95a5;
+  }
+
+  .better-picture-search__empty,
+  .better-picture-search__error,
+  .better-picture-search__loading {
+    padding: 16px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    color: #8b95a5;
+  }
+
+  .better-picture-search__error {
+    color: #f87171;
+    border: 1px dashed rgba(248, 113, 113, 0.3);
+    border-radius: 8px;
+    background: rgba(248, 113, 113, 0.05);
+  }
+
   @media (max-width: 380px) {
     .better-picture-controlbar {
       grid-template-columns: auto auto auto minmax(42px, 1fr) auto auto auto;
@@ -408,6 +628,138 @@ const DOCUMENT_PIP_STYLES = `
 `;
 
 let betterPicture = null;
+
+function isYouTubePage() {
+  return location.hostname === "www.youtube.com" || location.hostname === "youtube.com";
+}
+
+function injectYouTubePlayerBridge() {
+  if (!isYouTubePage() || document.documentElement.dataset.betterPictureYouTubeBridge === "loaded") {
+    return;
+  }
+
+  document.documentElement.dataset.betterPictureYouTubeBridge = "loaded";
+  const script = document.createElement("script");
+  script.src = chrome.runtime.getURL("youtube-player-bridge.js");
+  script.async = false;
+  document.documentElement.appendChild(script);
+  script.remove();
+}
+
+injectYouTubePlayerBridge();
+
+function decodeHtmlEntities(text) {
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = text || "";
+  return textarea.value;
+}
+
+function getYouTubeText(value) {
+  if (typeof value?.simpleText === "string") {
+    return value.simpleText;
+  }
+
+  if (Array.isArray(value?.runs)) {
+    return value.runs.map((run) => run.text || "").join("");
+  }
+
+  return "";
+}
+
+function collectYouTubeVideoRenderers(value, results = []) {
+  if (!value || typeof value !== "object") {
+    return results;
+  }
+
+  if (value.videoRenderer?.videoId) {
+    results.push(value.videoRenderer);
+  }
+
+  Object.values(value).forEach((child) => {
+    if (Array.isArray(child)) {
+      child.forEach((item) => collectYouTubeVideoRenderers(item, results));
+    } else if (child && typeof child === "object") {
+      collectYouTubeVideoRenderers(child, results);
+    }
+  });
+
+  return results;
+}
+
+function parseYouTubeInitialData(html) {
+  const match = html.match(/(?:var\s+ytInitialData\s*=\s*|window\["ytInitialData"\]\s*=\s*)(\{.+?\});\s*(?:<\/script>|var\s+meta|window\["ytInitialPlayerResponse"\])/s);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+async function searchYouTubeFromPage(query, signal) {
+  const searchUrl = new URL("/results", location.origin);
+  searchUrl.searchParams.set("search_query", query);
+  searchUrl.searchParams.set("sp", "EgIQAQ%3D%3D");
+
+  const response = await fetch(searchUrl.toString(), { signal });
+  if (!response.ok) {
+    throw new Error(`YouTube search failed with status ${response.status}`);
+  }
+
+  const html = await response.text();
+  const initialData = parseYouTubeInitialData(html);
+  const renderers = collectYouTubeVideoRenderers(initialData).slice(0, YOUTUBE_MINIPLAYER_SEARCH_LIMIT);
+
+  return renderers.map((renderer) => {
+    const thumbnail = renderer.thumbnail?.thumbnails?.at(-1) || renderer.thumbnail?.thumbnails?.[0] || {};
+
+    return {
+      videoId: renderer.videoId,
+      title: decodeHtmlEntities(getYouTubeText(renderer.title) || "Untitled video"),
+      channelTitle: decodeHtmlEntities(getYouTubeText(renderer.ownerText) || getYouTubeText(renderer.shortBylineText) || "YouTube"),
+      thumbnailUrl: thumbnail.url || "",
+      publishedAt: ""
+    };
+  });
+}
+
+function navigateYouTubeInPage(url) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function playYouTubeVideoInPage(videoId) {
+  return new Promise((resolve) => {
+    const requestId = `better-picture-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const responseEvent = "better-picture-youtube-player-response";
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener(responseEvent, onResponse);
+      resolve({ ok: false, error: "Timeout" });
+    }, 1500);
+
+    function onResponse(event) {
+      if (event.detail?.requestId !== requestId) {
+        return;
+      }
+
+      window.clearTimeout(timeout);
+      window.removeEventListener(responseEvent, onResponse);
+      resolve(event.detail || { ok: false });
+    }
+
+    window.addEventListener(responseEvent, onResponse);
+    window.dispatchEvent(new CustomEvent("better-picture-youtube-player-request", {
+      detail: { requestId, videoId }
+    }));
+  });
+}
 
 function isFiniteDuration(video) {
   return Number.isFinite(video.duration) && video.duration > 0;
@@ -957,6 +1309,11 @@ function createMiniPlayer(video, options = {}) {
   title.className = "better-picture-title";
   title.textContent = "";
 
+  const searchButton = hostDocument.createElement("button");
+  searchButton.className = "better-picture-button better-picture-button--compact better-picture-button--search";
+  searchButton.type = "button";
+  setButtonIcon(searchButton, "search", "Search videos");
+
   const controls = hostDocument.createElement("div");
   controls.className = "better-picture-controls";
 
@@ -1030,10 +1387,54 @@ function createMiniPlayer(video, options = {}) {
   resizeHandle.className = "better-picture-resize";
   resizeHandle.setAttribute("aria-hidden", "true");
 
-  controls.append(closeButton);
-  header.append(controls);
+  // ── Search Panel ───────────────────────────────────────────
+  const searchOverlay = hostDocument.createElement("div");
+  searchOverlay.className = "better-picture-search";
+  searchOverlay.hidden = true;
+
+  const searchHeader = hostDocument.createElement("div");
+  searchHeader.className = "better-picture-search__header";
+
+  const searchBackButton = hostDocument.createElement("button");
+  searchBackButton.className = "better-picture-button better-picture-button--compact better-picture-button--search-back";
+  searchBackButton.type = "button";
+  setButtonIcon(searchBackButton, "close", "Close search");
+
+  const searchTitle = hostDocument.createElement("span");
+  searchTitle.className = "better-picture-search__title";
+  searchTitle.textContent = "Search";
+
+  searchHeader.append(searchBackButton, searchTitle);
+
+  const searchForm = hostDocument.createElement("div");
+  searchForm.className = "better-picture-search__form";
+
+  const searchInput = hostDocument.createElement("input");
+  searchInput.className = "better-picture-search__input";
+  searchInput.type = "search";
+  searchInput.placeholder = "Search YouTube...";
+  searchInput.setAttribute("aria-label", "Search query");
+  searchInput.autocomplete = "off";
+
+  const searchGoButton = hostDocument.createElement("button");
+  searchGoButton.className = "better-picture-button better-picture-button--compact better-picture-button--search-go";
+  searchGoButton.type = "button";
+  searchGoButton.textContent = "GO";
+
+  searchForm.append(searchInput, searchGoButton);
+
+  const searchResults = hostDocument.createElement("div");
+  searchResults.className = "better-picture-search__results";
+  searchResults.setAttribute("role", "list");
+  searchResults.setAttribute("aria-label", "Search results");
+
+  searchOverlay.append(searchHeader, searchForm, searchResults);
+  // ── End Search Panel ─────────────────────────────────────
+
+  controls.append(searchButton, closeButton);
+  header.append(title, controls);
   controlBar.append(previousButton, backButton, playButton, seekRange, timeLabel, forwardButton, nextButton, muteButton, volumeRange);
-  stage.append(subtitleLayer, controlBar);
+  stage.append(subtitleLayer, controlBar, searchOverlay);
   player.append(header, stage);
 
   if (!isDocumentPip) {
@@ -1389,6 +1790,186 @@ function createMiniPlayer(video, options = {}) {
   syncVolumeControls();
   showControls();
 
+  // ── Search Panel Logic ─────────────────────────────────────
+
+  let searchAbortController = null;
+
+  const setSearchOpen = (open) => {
+    searchOverlay.hidden = !open;
+    if (open) {
+      setControlsHidden(false);
+      searchInput.focus();
+    } else {
+      searchInput.value = "";
+      searchResults.replaceChildren();
+      if (searchAbortController) {
+        searchAbortController.abort();
+        searchAbortController = null;
+      }
+    }
+  };
+
+  const renderSearchResults = (items) => {
+    searchResults.replaceChildren();
+    if (!items?.length) {
+      const empty = hostDocument.createElement("div");
+      empty.className = "better-picture-search__empty";
+      empty.textContent = "No results found.";
+      searchResults.append(empty);
+      return;
+    }
+    items.forEach((item) => {
+      const card = hostDocument.createElement("div");
+      card.className = "better-picture-search__choice better-picture-search__choice--with-thumb";
+      card.setAttribute("role", "listitem");
+      card.tabIndex = 0;
+
+      const thumb = hostDocument.createElement("img");
+      thumb.className = "better-picture-search__thumb";
+      thumb.src = item.thumbnailUrl;
+      thumb.alt = "";
+      thumb.width = 72;
+      thumb.height = 40;
+      thumb.loading = "lazy";
+      thumb.onerror = () => { thumb.style.display = "none"; };
+
+      const info = hostDocument.createElement("div");
+      info.className = "better-picture-search__choice-info";
+
+      const titleEl = hostDocument.createElement("div");
+      titleEl.className = "better-picture-search__choice-title";
+      titleEl.textContent = item.title;
+
+      const channel = hostDocument.createElement("div");
+      channel.className = "better-picture-search__choice-channel";
+      channel.textContent = item.channelTitle;
+
+      info.append(titleEl, channel);
+      card.append(thumb, info);
+
+      const selectVideo = async () => {
+        const videoUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(item.videoId)}`;
+        if (isYouTubePage()) {
+          const result = await playYouTubeVideoInPage(item.videoId);
+          if (!result.ok) {
+            navigateYouTubeInPage(videoUrl);
+          }
+          setSearchOpen(false);
+        } else {
+          // Non-YouTube: set autostart, navigate to YouTube
+          chrome.runtime.sendMessage({
+            type: BETTER_PICTURE_MESSAGE_TYPES.YOUTUBE_SEARCH,
+            action: "setAutostart",
+            url: videoUrl,
+            timestamp: Date.now()
+          }).catch(() => {});
+          location.href = videoUrl;
+        }
+      };
+
+      card.addEventListener("click", selectVideo);
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          selectVideo();
+        }
+      });
+
+      searchResults.append(card);
+    });
+  };
+
+  const renderSearchError = (message) => {
+    searchResults.replaceChildren();
+    const err = hostDocument.createElement("div");
+    err.className = "better-picture-search__error";
+    err.textContent = message;
+    searchResults.append(err);
+  };
+
+  const renderLoading = (text) => {
+    searchResults.replaceChildren();
+    const load = hostDocument.createElement("div");
+    load.className = "better-picture-search__loading";
+    load.textContent = text || "Searching...";
+    searchResults.append(load);
+  };
+
+  const onSearchSubmit = async () => {
+    const query = searchInput.value.trim();
+    if (!query) return;
+
+    renderLoading("Searching...");
+    searchGoButton.disabled = true;
+
+    if (searchAbortController) {
+      searchAbortController.abort();
+    }
+    searchAbortController = new AbortController();
+
+    try {
+      if (isYouTubePage()) {
+        const items = await searchYouTubeFromPage(query, searchAbortController.signal);
+        renderSearchResults(items);
+      } else {
+        // Non-YouTube: use YouTube Data API
+        const result = await chrome.runtime.sendMessage({
+          type: BETTER_PICTURE_MESSAGE_TYPES.YOUTUBE_SEARCH,
+          action: "search",
+          query,
+          maxResults: 8
+        });
+
+        if (result?.error === "NO_API_KEY") {
+          renderSearchError("No API key set. Configure it in the popup.");
+        } else if (result?.error) {
+          renderSearchError(`Search failed: ${result.message || result.error}`);
+        } else {
+          renderSearchResults(result?.items);
+        }
+      }
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        renderSearchError("Search failed.");
+      }
+    } finally {
+      searchGoButton.disabled = false;
+    }
+  };
+
+  const onSearchButtonClick = () => {
+    if (searchOverlay.hidden) {
+      setSearchOpen(true);
+      if (isYouTubePage()) {
+        searchInput.placeholder = "Search YouTube videos...";
+      } else {
+        searchInput.placeholder = "Search YouTube via API...";
+      }
+    } else {
+      setSearchOpen(false);
+    }
+  };
+
+  const onSearchBackClick = () => {
+    setSearchOpen(false);
+  };
+
+  searchButton.addEventListener("click", onSearchButtonClick);
+  searchBackButton.addEventListener("click", onSearchBackClick);
+  searchGoButton.addEventListener("click", onSearchSubmit);
+
+  const onSearchInputKeydown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onSearchSubmit();
+    }
+    if (e.key === "Escape") {
+      setSearchOpen(false);
+    }
+  };
+  searchInput.addEventListener("keydown", onSearchInputKeydown);
+  // ── End Search Panel Logic ─────────────────────────────────
+
   return {
     root,
     video,
@@ -1411,6 +1992,14 @@ function createMiniPlayer(video, options = {}) {
       previousButton.removeEventListener("click", onPreviousVideoClick);
       nextButton.removeEventListener("click", onNextVideoClick);
       closeButton.removeEventListener("click", onCloseClick);
+      searchButton.removeEventListener("click", onSearchButtonClick);
+      searchBackButton.removeEventListener("click", onSearchBackClick);
+      searchGoButton.removeEventListener("click", onSearchSubmit);
+      searchInput.removeEventListener("keydown", onSearchInputKeydown);
+      if (searchAbortController) {
+        searchAbortController.abort();
+        searchAbortController = null;
+      }
       root.removeEventListener("pointermove", onPointerActivity);
       root.removeEventListener("pointerenter", onPointerActivity);
       root.removeEventListener("focusin", onFocusIn);
@@ -1565,6 +2154,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === BETTER_PICTURE_MESSAGE_TYPES.STATUS_REQUEST) {
     sendResponse(getStatus());
+    return true;
+  }
+
+  if (message.type === BETTER_PICTURE_MESSAGE_TYPES.NAVIGATE) {
+    const navUrl = message.url;
+    if (!navUrl) {
+      sendResponse({ error: "No URL provided" });
+      return true;
+    }
+    if (isYouTubePage()) {
+      const videoId = new URL(navUrl, location.href).searchParams.get("v");
+      if (videoId) {
+        playYouTubeVideoInPage(videoId).then((result) => {
+          if (!result.ok) {
+            navigateYouTubeInPage(navUrl);
+          }
+          sendResponse({ ok: true, method: result.ok ? "loadVideoById" : "spa" });
+        });
+        return true;
+      }
+
+      navigateYouTubeInPage(navUrl);
+      sendResponse({ ok: true, method: "spa" });
+    } else {
+      // Non-YouTube: set auto-restart, then navigate
+      chrome.runtime.sendMessage({
+        type: BETTER_PICTURE_MESSAGE_TYPES.YOUTUBE_SEARCH,
+        action: "setAutostart",
+        url: navUrl,
+        timestamp: Date.now()
+      }).catch(() => {});
+      location.href = navUrl;
+      sendResponse({ ok: true, method: "navigate" });
+    }
     return true;
   }
 
