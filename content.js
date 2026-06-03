@@ -167,6 +167,11 @@ const BUTTON_ICONS = {
       { d: "M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z" },
       { d: "M21 21l-4.35-4.35" }
     ]
+  },
+  cc: {
+    paths: [
+      { d: "M4 6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H4zm5.5 8c0 .83-.67 1.5-1.5 1.5h-2A1.5 1.5 0 0 1 4.5 14V10c0-.83.67-1.5 1.5-1.5h2c.83 0 1.5.67 1.5 1.5v.5h-1.5v-.5h-2v4h2v-.5h1.5v.5zm7 0c0 .83-.67 1.5-1.5 1.5h-2a1.5 1.5 0 0 1-1.5-1.5V10c0-.83.67-1.5 1.5-1.5h2c.83 0 1.5.67 1.5 1.5v.5h-1.5v-.5h-2v4h2v-.5h1.5v.5z", fill: "currentColor", stroke: "none" }
+    ]
   }
 };
 const DOCUMENT_PIP_STYLES = `
@@ -242,25 +247,29 @@ const DOCUMENT_PIP_STYLES = `
     height: 30px;
     min-width: 34px;
     min-height: 30px;
-    border: 1px solid rgba(229, 231, 235, 0.14);
-    border-radius: 999px;
+    border: 1px solid #111;
+    border-radius: 6px;
     padding: 0;
-    background: #20242d;
+    background: linear-gradient(180deg, #3a3f4a 0%, #2a2e36 100%);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 2px 3px rgba(0, 0, 0, 0.4);
     color: #f5f7fb;
     font: inherit;
     font-size: 12px;
     font-weight: 760;
     line-height: 1;
     cursor: pointer;
+    transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
   }
 
   .better-picture-button:hover {
     border-color: rgba(255, 255, 255, 0.22);
-    background: #2a303b;
+    background: linear-gradient(180deg, #444955 0%, #353943 100%);
   }
 
   .better-picture-button:active {
-    transform: translateY(1px) scale(0.99);
+    transform: translateY(1px);
+    background: linear-gradient(180deg, #2a2e36 0%, #3a3f4a 100%);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
   }
 
   .better-picture-button:focus-visible {
@@ -274,8 +283,8 @@ const DOCUMENT_PIP_STYLES = `
   }
 
   .better-picture-button:disabled:hover {
-    border-color: rgba(229, 231, 235, 0.14);
-    background: #20242d;
+    border-color: #111;
+    background: linear-gradient(180deg, #3a3f4a 0%, #2a2e36 100%);
   }
 
   .better-picture-stage {
@@ -383,8 +392,9 @@ const DOCUMENT_PIP_STYLES = `
     bottom: 0;
     left: 0;
     z-index: 3;
-    display: grid;
-    grid-template-columns: auto auto auto minmax(46px, 1fr) auto auto auto auto minmax(44px, 64px);
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-between;
     align-items: center;
     gap: 6px;
     min-height: 48px;
@@ -439,7 +449,13 @@ const DOCUMENT_PIP_STYLES = `
     min-height: 30px;
   }
 
+  .better-picture-seekbar {
+    flex: 1 1 40px;
+    min-width: 40px;
+  }
+
   .better-picture-volume {
+    flex: 0 1 64px;
     width: 64px;
   }
 
@@ -601,20 +617,28 @@ const DOCUMENT_PIP_STYLES = `
     background: rgba(248, 113, 113, 0.05);
   }
 
+  @media (max-width: 460px) {
+    .better-picture-button--adjacent {
+      display: none !important;
+    }
+  }
+
   @media (max-width: 380px) {
-    .better-picture-controlbar {
-      grid-template-columns: auto auto auto minmax(42px, 1fr) auto auto auto;
-      gap: 6px;
+    .better-picture-button--seek {
+      display: none !important;
     }
 
     .better-picture-time {
       min-width: 54px;
       font-size: 10px;
     }
+  }
 
+  @media (max-width: 300px) {
     .better-picture-button--mute,
-    .better-picture-volume {
-      display: none;
+    .better-picture-volume,
+    .better-picture-time {
+      display: none !important;
     }
   }
 
@@ -1374,6 +1398,11 @@ function createMiniPlayer(video, options = {}) {
   muteButton.className = "better-picture-button better-picture-button--compact better-picture-button--mute";
   muteButton.type = "button";
 
+  const ccButton = hostDocument.createElement("button");
+  ccButton.className = "better-picture-button better-picture-button--compact better-picture-button--cc";
+  ccButton.type = "button";
+  setButtonIcon(ccButton, "cc", "Toggle subtitles");
+
   const volumeRange = hostDocument.createElement("input");
   volumeRange.className = "better-picture-range better-picture-volume";
   volumeRange.type = "range";
@@ -1433,7 +1462,7 @@ function createMiniPlayer(video, options = {}) {
 
   controls.append(searchButton, closeButton);
   header.append(title, controls);
-  controlBar.append(previousButton, backButton, playButton, seekRange, timeLabel, forwardButton, nextButton, muteButton, volumeRange);
+  controlBar.append(previousButton, backButton, playButton, seekRange, timeLabel, forwardButton, nextButton, ccButton, muteButton, volumeRange);
   stage.append(subtitleLayer, controlBar, searchOverlay);
   player.append(header, stage);
 
@@ -1602,6 +1631,14 @@ function createMiniPlayer(video, options = {}) {
     showControls();
   };
 
+  let isCCEnabled = true;
+  const onCcClick = () => {
+    isCCEnabled = !isCCEnabled;
+    subtitleLayer.style.display = isCCEnabled ? "" : "none";
+    ccButton.style.opacity = isCCEnabled ? "1" : "0.5";
+    showControls();
+  };
+
   const onCloseClick = () => stopBetterPicture();
 
   const onPointerActivity = () => {
@@ -1667,6 +1704,12 @@ function createMiniPlayer(video, options = {}) {
     if (event.key.toLowerCase() === "m") {
       event.preventDefault();
       onMuteClick();
+      return;
+    }
+
+    if (event.key.toLowerCase() === "c") {
+      event.preventDefault();
+      onCcClick();
       return;
     }
 
@@ -1765,6 +1808,7 @@ function createMiniPlayer(video, options = {}) {
   seekRange.addEventListener("pointercancel", onSeekPointerUp);
   seekRange.addEventListener("input", onSeekInput);
   muteButton.addEventListener("click", onMuteClick);
+  ccButton.addEventListener("click", onCcClick);
   volumeRange.addEventListener("input", onVolumeInput);
   hostDocument.addEventListener("keydown", onKeyDown);
 

@@ -3,43 +3,48 @@
 :root {
   color-scheme: dark;
 
-  /* Color Palette Specs */
-  --bg: #050505;                       /* Absolute Void Black */
-  --bg-elevated: #1a1a1a;              /* Graphite Gray */
-  --panel: #050505;                    /* Raw Layer Base */
-  --panel-strong: #1a1a1a;             /* Layer Level 1 */
-  --panel-hover: #262626;              /* Hover Active layer */
+  /* Premium Skeuomorphic Colors */
+  --bg: #1c1d21;
+  --bg-elevated: linear-gradient(180deg, #2a2d35 0%, #202228 100%);
+  --panel: linear-gradient(180deg, #24272e 0%, #1a1c21 100%);
+  --panel-strong: linear-gradient(180deg, #2e323a 0%, #24272e 100%);
+  --panel-hover: linear-gradient(180deg, #353943 0%, #2b2e36 100%);
 
-  /* Mathematical Hard Outlines */
-  --line: #1a1a1a;                     /* Dark Slate outline */
-  --line-strong: #666666;              /* Muted Gray outline */
+  /* Borders & Bevels */
+  --line: #111215;
+  --line-strong: rgba(255, 255, 255, 0.1);
 
-  /* System Typography Colors */
-  --text: #fafaf5;                     /* Terminal White */
-  --text-secondary: #e5e2e1;           /* Raw Light Gray */
-  --text-muted: #666666;               /* Graphite Gray Muted */
-  --text-subtle: #353534;              /* Deep Muted */
+  /* Shadows for Tactile Feel */
+  --shadow-drop: 0 4px 6px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-inset: inset 0 1px 1px rgba(255,255,255,0.1), inset 0 -1px 1px rgba(0,0,0,0.4);
+  --shadow-pressed: inset 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 1px rgba(0,0,0,0.8);
 
-  /* Tensor Accents */
-  --accent: #ffb800;                   /* Tensor Amber */
-  --accent-strong: #ffb800;
-  --accent-soft: rgba(255, 184, 0, 0.1);
-  --accent-glow: rgba(255, 184, 0, 0.2);
+  /* Typography */
+  --text: #f0f0f0;
+  --text-secondary: #b0b3b8;
+  --text-muted: #8a8d94;
+  --text-subtle: #5f636b;
 
-  --ok: #00ff41;                       /* Matrix Green (Active compile / go state) */
-  --ok-glow: rgba(0, 255, 65, 0.25);
-  --warn: #ffb800;                     /* Amber strobe warning */
-  --danger: #ffb4ab;                   /* Tensor Error Red */
+  /* Accents */
+  --accent: #4da6ff;
+  --accent-strong: #66b3ff;
+  --accent-soft: rgba(77, 166, 255, 0.15);
+  --accent-glow: rgba(77, 166, 255, 0.3);
 
-  /* Strict Zero-Abstraction (0px) Curves */
-  --radius-sm: 0px;
-  --radius: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
+  --ok: #34d399;
+  --ok-glow: rgba(52, 211, 153, 0.3);
+  --warn: #fbbf24;
+  --danger: #f87171;
 
-  /* Typography Stacks */
-  --font-mono: "JetBrains Mono", monospace;
-  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Smooth Radii */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  /* Fonts */
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   background: var(--bg);
   color: var(--text);
