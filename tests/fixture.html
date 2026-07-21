@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Better Picture Automated Test</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 32px;
+      background: #111827;
+      color: #f9fafb;
+      font-family: system-ui, sans-serif;
+    }
+
+    #video-host {
+      width: 640px;
+      max-width: 100%;
+    }
+
+    video {
+      display: block;
+      width: 640px;
+      height: 360px;
+      max-width: 100%;
+      background: #030712;
+    }
+
+    .fixture-caption {
+      margin-top: 12px;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Better Picture browser fixture</h1>
+    <div id="video-host">
+      <video id="fixture-video" controls muted playsinline></video>
+    </div>
+    <div class="fixture-caption" aria-live="polite">Automated caption is visible.</div>
+  </main>
+
+  <script>
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 360;
+    const context = canvas.getContext("2d");
+    let frame = 0;
+
+    function drawFrame() {
+      frame += 1;
+      context.fillStyle = "#0f172a";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#60a5fa";
+      context.fillRect((frame * 2) % canvas.width, 130, 100, 100);
+      context.fillStyle = "#f8fafc";
+      context.font = "32px system-ui";
+      context.fillText("Better Picture Test", 160, 190);
+      requestAnimationFrame(drawFrame);
+    }
+
+    drawFrame();
+    const video = document.querySelector("#fixture-video");
+    video.srcObject = canvas.captureStream(15);
+    video.play().catch(() => {});
+    window.fixtureReady = true;
+  </script>
+</body>
+</html>

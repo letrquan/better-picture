@@ -4,7 +4,7 @@
 
 Better Picture is a small Manifest V3 Chromium extension for Chrome and Edge. It creates a caption-aware floating mini-player for the active page video.
 
-There is no bundler, package manager, framework, or test runner in this repository. The extension ships as plain files loaded directly by the browser.
+The extension ships as plain files loaded directly by the browser. Playwright is installed as a development-only dependency for automated Chromium extension testing; there is no production bundler or framework.
 
 ## Essential Commands
 
@@ -15,6 +15,14 @@ node --check content.js
 node --check popup.js
 node --check background.js
 node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest json ok')"
+```
+
+Run the automated Chromium extension test:
+
+```powershell
+npm install
+npx playwright install chromium
+npm test
 ```
 
 Run the local demo from the repository root:
@@ -39,6 +47,7 @@ Manual extension loading is via `chrome://extensions` or `edge://extensions`, de
 - `content.js` contains almost all runtime behavior: video selection, mini-player creation, Document Picture-in-Picture, in-page fallback, caption extraction, playback controls, keyboard shortcuts, cleanup, and message handling.
 - `content.css` styles only the in-page fallback mini-player injected into the host page.
 - `demo/index.html` and `demo/captions.vtt` provide the manual caption test page.
+- `tests/extension.spec.js`, `tests/fixture.html`, and `tests/fixture-server.js` provide the deterministic Playwright browser test.
 - `icons/` contains extension icon assets referenced by `manifest.json`.
 
 ## Runtime Architecture and Flow
@@ -118,7 +127,7 @@ Accessibility patterns already present include `aria-label`, `aria-live`, native
 
 ## Testing Approach
 
-There are no automated tests in the repository. Use syntax/config checks plus manual browser verification.
+Run `npm test` for the automated Chromium extension test, then use syntax/config checks and manual browser verification for behavior not covered by the fixture.
 
 Minimum manual checks after behavior changes:
 
@@ -132,7 +141,7 @@ For CSS or control-layout changes, verify both Document Picture-in-Picture and i
 
 ## Non-Obvious Constraints
 
-- No dependencies are installed or declared. Do not add package-manager workflows unless explicitly requested.
+- Playwright is the only declared development dependency and is used exclusively for browser testing. The extension runtime remains dependency-free and unbundled.
 - `manifest.json` now requests `tabs`, `activeTab`, and `scripting` permissions. The `tabs` permission enables cross-tab video scanning from the popup and background worker.
 - The popup loads Inter font from Google Fonts via a `<link>` tag; this external resource requires network access from the popup page.
 - `content_scripts.matches` is `<all_urls>`, so content-side code must tolerate arbitrary pages and missing/hostile media structures.

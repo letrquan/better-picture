@@ -96,12 +96,63 @@ To test it:
 
 The demo uses a public remote sample video from MDN and does not bundle copyrighted media.
 
+## Debug Logging
+
+Debug logs are opt-in so normal browsing is not noisy. Enable them from the extension service-worker console:
+
+```js
+chrome.storage.local.set({ debugLogging: true })
+```
+
+Reload open pages after enabling if their content scripts were already running. Logs use the prefix `[Better Picture]` and include popup tab-scan timing, background scan/search timing, mini-player lifecycle events, Picture-in-Picture failures, YouTube navigation, and subtitle mode changes.
+
+Disable logging with:
+
+```js
+chrome.storage.local.set({ debugLogging: false })
+```
+
+Inspect popup logs from the popup's DevTools, page/content logs from the page's DevTools, and background logs from the extension service worker inspector.
+
+## Automated Browser Test
+
+The Playwright test launches Chromium with the unpacked extension, opens a local deterministic video fixture, and verifies:
+
+- Video detection and extension messaging.
+- Mini-player startup in Document Picture-in-Picture or page-overlay mode.
+- Source-video docking, caption rendering, and playback controls.
+- Cleanup and restoration of the video to its original page container.
+- Absence of uncaught page errors.
+
+Install the test dependency and Chromium once:
+
+```powershell
+npm install
+npx playwright install chromium
+```
+
+Run the automated test headlessly:
+
+```powershell
+npm test
+```
+
+To watch the browser test, run:
+
+```powershell
+npm run test:browser:headed
+```
+
+Set `BROWSER_CHANNEL=chrome` or `BROWSER_CHANNEL=msedge` to use an installed browser channel instead of Playwright Chromium. Test traces and screenshots are retained under `test-results/` when a test fails.
+
 ## Development Checks
 
 Run these lightweight checks after editing:
 
 ```powershell
 node --check content.js
+node --check popup.js
+node --check background.js
 node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest json ok')"
 ```
 
@@ -116,6 +167,12 @@ better-picture/
 |-- content.js
 |-- content.css
 |-- background.js
+|-- package.json
+|-- playwright.config.js
+|-- tests/
+|   |-- extension.spec.js
+|   |-- fixture.html
+|   `-- fixture-server.js
 |-- demo/
 |   |-- index.html
 |   `-- captions.vtt

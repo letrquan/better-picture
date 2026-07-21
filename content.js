@@ -5,6 +5,33 @@ if (globalThis.__BETTER_PICTURE_CONTENT_LOADED__) {
 
 globalThis.__BETTER_PICTURE_CONTENT_LOADED__ = true;
 
+const DEBUG_STORAGE_KEY = "debugLogging";
+const DEBUG_PREFIX = "[Better Picture][content]";
+let debugLoggingEnabled = false;
+
+function debugLog(event, details) {
+  if (!debugLoggingEnabled) return;
+
+  if (details === undefined) {
+    console.debug(DEBUG_PREFIX, event);
+  } else {
+    console.debug(DEBUG_PREFIX, event, details);
+  }
+}
+
+chrome.storage.local.get(DEBUG_STORAGE_KEY)
+  .then((result) => {
+    debugLoggingEnabled = Boolean(result?.[DEBUG_STORAGE_KEY]);
+    debugLog("debug logging enabled", { page: location.hostname });
+  })
+  .catch(() => {});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local" || !changes[DEBUG_STORAGE_KEY]) return;
+  debugLoggingEnabled = Boolean(changes[DEBUG_STORAGE_KEY].newValue);
+  debugLog("debug logging enabled", { page: location.hostname });
+});
+
 // ── Auto-Restart Detection (after page navigation) ─────────
 (async () => {
   try {
@@ -13,6 +40,7 @@ globalThis.__BETTER_PICTURE_CONTENT_LOADED__ = true;
       action: "getAndClearAutostart"
     });
     if (result?.url && Date.now() - (result.timestamp || 0) < 30000) {
+      debugLog("autostart scheduled");
       setTimeout(() => {
         if (!betterPicture) {
           startBetterPicture();
@@ -23,24 +51,49 @@ globalThis.__BETTER_PICTURE_CONTENT_LOADED__ = true;
 })();
 
 // ── YouTube SPA Navigation Listener ────────────────────────
+let youtubeNavigationRun = 0;
+let videoMutationTimer = 0;
+
 const onYouTubeNavigation = () => {
   if (!betterPicture) return;
 
+  const navigationRun = ++youtubeNavigationRun;
+  debugLog("YouTube navigation detected", { run: navigationRun });
+
   const waitForVideo = (attempts = 0) => {
-    if (attempts > 20) return;
+    if (attempts > 20 || navigationRun !== youtubeNavigationRun) return;
+
+    const activePlayer = betterPicture;
+    if (!activePlayer) return;
 
     const newVideo = findBestVideo();
-    if (newVideo && newVideo !== betterPicture.video && isFiniteDuration(newVideo)) {
-      betterPicture.cleanup();
-      betterPicture = null;
-      setTimeout(() => {
-        if (!betterPicture) {
-          startBetterPicture();
-        }
-      }, 500);
-    } else {
+    if (!newVideo || !isFiniteDuration(newVideo)) {
       setTimeout(() => waitForVideo(attempts + 1), 300);
+      return;
     }
+
+    if (newVideo === activePlayer.video) return;
+
+    debugLog("replacing video after YouTube navigation", {
+      attempts,
+      mode: activePlayer.displayMode
+    });
+
+    if (activePlayer.displayMode === "documentPip" && activePlayer.replaceVideo) {
+      activePlayer.replaceVideo(newVideo);
+      return;
+    }
+
+    activePlayer.cleanup();
+    if (betterPicture === activePlayer) {
+      betterPicture = null;
+    }
+
+    setTimeout(() => {
+      if (!betterPicture && navigationRun === youtubeNavigationRun) {
+        startBetterPicture();
+      }
+    }, 500);
   };
   waitForVideo();
 };
@@ -48,15 +101,22 @@ const onYouTubeNavigation = () => {
 window.addEventListener("yt-navigate-finish", onYouTubeNavigation);
 window.addEventListener("popstate", onYouTubeNavigation);
 
-const videoObserver = new MutationObserver(() => {
-  if (betterPicture && isYouTubePage()) {
-    const newVideo = findBestVideo();
-    if (newVideo && newVideo !== betterPicture.video && isFiniteDuration(newVideo)) {
-      onYouTubeNavigation();
+function nodeContainsVideo(node) {
+  return node?.nodeType === Node.ELEMENT_NODE &&
+    (node.matches("video") || node.querySelector("video"));
+}
+
+if (isYouTubePage()) {
+  const videoObserver = new MutationObserver((mutations) => {
+    if (!betterPicture || !mutations.some((mutation) => Array.from(mutation.addedNodes).some(nodeContainsVideo))) {
+      return;
     }
-  }
-});
-videoObserver.observe(document.body, { childList: true, subtree: true });
+
+    window.clearTimeout(videoMutationTimer);
+    videoMutationTimer = window.setTimeout(onYouTubeNavigation, 150);
+  });
+  videoObserver.observe(document.body, { childList: true, subtree: true });
+}
 
 const BETTER_PICTURE_MESSAGE_TYPES = {
   START: "BETTER_PICTURE_START",
@@ -65,12 +125,14 @@ const BETTER_PICTURE_MESSAGE_TYPES = {
   YOUTUBE_SEARCH: "BETTER_PICTURE_YOUTUBE_SEARCH",
   NAVIGATE: "BETTER_PICTURE_NAVIGATE"
 };
+const USER_GESTURE_START_EVENT = "better-picture-start-from-user-gesture";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const ROOT_ID = "better-picture-root";
 const MIN_PLAYER_WIDTH = 260;
 const MIN_PLAYER_HEIGHT = 160;
-const CAPTION_POLL_MS = 120;
+const CAPTION_POLL_MS = 250;
+const ADJACENT_CONTROLS_SYNC_MS = 1000;
 const CONTROLS_IDLE_MS = 1800;
 const YOUTUBE_CAPTION_SEGMENT_SELECTOR = ".ytp-caption-window-container .ytp-caption-segment";
 const YOUTUBE_CAPTION_SELECTOR = [
@@ -652,6 +714,7 @@ const DOCUMENT_PIP_STYLES = `
 `;
 
 let betterPicture = null;
+let betterPictureStartPromise = null;
 
 function isYouTubePage() {
   return location.hostname === "www.youtube.com" || location.hostname === "youtube.com";
@@ -690,20 +753,23 @@ function getYouTubeText(value) {
   return "";
 }
 
-function collectYouTubeVideoRenderers(value, results = []) {
-  if (!value || typeof value !== "object") {
+function collectYouTubeVideoRenderers(value, results = [], seenVideoIds = new Set()) {
+  // Stop walking YouTube's large response tree once enough unique results are found.
+  if (!value || typeof value !== "object" || results.length >= YOUTUBE_MINIPLAYER_SEARCH_LIMIT) {
     return results;
   }
 
-  if (value.videoRenderer?.videoId) {
-    results.push(value.videoRenderer);
+  const renderer = value.videoRenderer;
+  if (renderer?.videoId && !seenVideoIds.has(renderer.videoId)) {
+    seenVideoIds.add(renderer.videoId);
+    results.push(renderer);
   }
 
   Object.values(value).forEach((child) => {
     if (Array.isArray(child)) {
-      child.forEach((item) => collectYouTubeVideoRenderers(item, results));
+      child.forEach((item) => collectYouTubeVideoRenderers(item, results, seenVideoIds));
     } else if (child && typeof child === "object") {
-      collectYouTubeVideoRenderers(child, results);
+      collectYouTubeVideoRenderers(child, results, seenVideoIds);
     }
   });
 
@@ -735,7 +801,7 @@ async function searchYouTubeFromPage(query, signal) {
 
   const html = await response.text();
   const initialData = parseYouTubeInitialData(html);
-  const renderers = collectYouTubeVideoRenderers(initialData).slice(0, YOUTUBE_MINIPLAYER_SEARCH_LIMIT);
+  const renderers = collectYouTubeVideoRenderers(initialData);
 
   return renderers.map((renderer) => {
     const thumbnail = renderer.thumbnail?.thumbnails?.at(-1) || renderer.thumbnail?.thumbnails?.[0] || {};
@@ -789,40 +855,37 @@ function isFiniteDuration(video) {
   return Number.isFinite(video.duration) && video.duration > 0;
 }
 
-function isVisibleVideo(video) {
+function scoreVisibleVideo(video) {
   const rect = video.getBoundingClientRect();
+  if (rect.width < 80 || rect.height < 45) return null;
+
   const style = window.getComputedStyle(video);
+  if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+    return null;
+  }
 
-  return rect.width >= 80 &&
-    rect.height >= 45 &&
-    style.display !== "none" &&
-    style.visibility !== "hidden" &&
-    Number(style.opacity) !== 0;
-}
-
-function scoreVideo(video) {
-  const rect = video.getBoundingClientRect();
   let score = rect.width * rect.height;
 
-  if (!video.paused) {
-    score += 1000000;
-  }
-
-  if (isFiniteDuration(video)) {
-    score += 200000;
-  }
-
-  if (video.currentTime > 0) {
-    score += 100000;
-  }
+  if (!video.paused) score += 1000000;
+  if (isFiniteDuration(video)) score += 200000;
+  if (video.currentTime > 0) score += 100000;
 
   return score;
 }
 
 function findBestVideo() {
-  return Array.from(document.querySelectorAll("video"))
-    .filter(isVisibleVideo)
-    .sort((first, second) => scoreVideo(second) - scoreVideo(first))[0] || null;
+  let bestVideo = null;
+  let bestScore = -1;
+
+  for (const video of document.querySelectorAll("video")) {
+    const score = scoreVisibleVideo(video);
+    if (score !== null && score > bestScore) {
+      bestVideo = video;
+      bestScore = score;
+    }
+  }
+
+  return bestVideo;
 }
 
 function clamp(value, min, max) {
@@ -926,21 +989,12 @@ function findYouTubeCaptionText() {
     .join("\n");
 }
 
-function findVisibleCaptionSegmentsText(selector) {
-  const text = Array.from(document.querySelectorAll(selector))
-    .filter(isCaptionElementCandidate)
-    .map((element) => normalizeCaptionText(element.textContent || ""))
-    .filter(Boolean)
-    .join(" ");
-
-  return normalizeCaptionText(text);
-}
-
 function findVisibleCaptionText() {
-  return findYouTubeCaptionText() ||
-    findVisibleCaptionSegmentsText(YOUTUBE_CAPTION_SEGMENT_SELECTOR) ||
-    findVisibleCaptionTextBySelector(YOUTUBE_CAPTION_SELECTOR) ||
-    findVisibleCaptionTextBySelector(CAPTION_SELECTOR);
+  if (isYouTubePage()) {
+    return findYouTubeCaptionText();
+  }
+
+  return findVisibleCaptionTextBySelector(CAPTION_SELECTOR);
 }
 
 function renderSubtitleText(subtitleLayer, text, mode) {
@@ -981,6 +1035,8 @@ function createSubtitleController(video, subtitleLayer) {
   const originalTrackModes = new Map();
   let fallbackInterval = 0;
   let mode = "unavailable";
+  let lastRenderedText = null;
+  let lastRenderedMode = null;
   let hasDetectedCaption = false;
 
   const render = (text, nextMode) => {
@@ -991,6 +1047,14 @@ function createSubtitleController(video, subtitleLayer) {
     }
 
     mode = !normalizedText && hasDetectedCaption ? "captionGap" : nextMode;
+    if (normalizedText === lastRenderedText && mode === lastRenderedMode) return;
+
+    lastRenderedText = normalizedText;
+
+    if (mode !== lastRenderedMode) {
+      debugLog("subtitle mode changed", { mode, hasText: Boolean(normalizedText) });
+    }
+    lastRenderedMode = mode;
     renderSubtitleText(subtitleLayer, text, mode);
   };
 
@@ -1510,6 +1574,17 @@ function createMiniPlayer(video, options = {}) {
     scheduleControlsHide();
   };
 
+  let lastAdjacentControlsSync = -Infinity;
+
+  const syncAdjacentControls = (force = false) => {
+    const now = performance.now();
+    if (!force && now - lastAdjacentControlsSync < ADJACENT_CONTROLS_SYNC_MS) return;
+
+    lastAdjacentControlsSync = now;
+    previousButton.disabled = !findAdjacentVideoControl("previous");
+    nextButton.disabled = !findAdjacentVideoControl("next");
+  };
+
   const syncTransportControls = () => {
     const bounds = getSeekBounds(video);
     const canSeek = Boolean(bounds);
@@ -1519,9 +1594,7 @@ function createMiniPlayer(video, options = {}) {
     forwardButton.disabled = !canSeek || video.currentTime >= bounds.end - 0.25;
 
     seekRange.disabled = !canSeek;
-    previousButton.disabled = !findAdjacentVideoControl("previous");
-    nextButton.disabled = !findAdjacentVideoControl("next");
-
+    syncAdjacentControls();
     if (canSeek) {
       seekRange.min = String(bounds.start);
       seekRange.max = String(bounds.end);
@@ -1573,6 +1646,7 @@ function createMiniPlayer(video, options = {}) {
 
   const onPreviousVideoClick = () => {
     if (triggerAdjacentVideo("previous")) {
+      syncAdjacentControls(true);
       syncTransportControls();
     }
     showControls();
@@ -1580,6 +1654,7 @@ function createMiniPlayer(video, options = {}) {
 
   const onNextVideoClick = () => {
     if (triggerAdjacentVideo("next")) {
+      syncAdjacentControls(true);
       syncTransportControls();
     }
     showControls();
@@ -2077,6 +2152,10 @@ function canUseDocumentPip() {
   return Boolean(window.documentPictureInPicture?.requestWindow);
 }
 
+function hasDocumentPipUserActivation() {
+  return !navigator.userActivation || navigator.userActivation.isActive;
+}
+
 function prepareDocumentPipDocument(pipWindow) {
   const pipDocument = pipWindow.document;
   pipDocument.title = "Better Picture";
@@ -2100,11 +2179,12 @@ function getDocumentPipSize(video) {
 async function createDocumentPipMiniPlayer(video) {
   const pipWindow = await window.documentPictureInPicture.requestWindow(getDocumentPipSize(video));
   const pipDocument = prepareDocumentPipDocument(pipWindow);
-  const miniPlayer = createMiniPlayer(video, {
+  const miniPlayerOptions = {
     document: pipDocument,
     window: pipWindow,
     mode: "documentPip"
-  });
+  };
+  let miniPlayer = createMiniPlayer(video, miniPlayerOptions);
 
   let cleaningUp = false;
   const onPageHide = () => {
@@ -2116,8 +2196,23 @@ async function createDocumentPipMiniPlayer(video) {
   pipWindow.addEventListener("pagehide", onPageHide);
 
   return {
-    ...miniPlayer,
     displayMode: "documentPip",
+    get root() {
+      return miniPlayer.root;
+    },
+    get video() {
+      return miniPlayer.video;
+    },
+    get subtitleLayer() {
+      return miniPlayer.subtitleLayer;
+    },
+    getSubtitleMode() {
+      return miniPlayer.getSubtitleMode();
+    },
+    replaceVideo(nextVideo) {
+      miniPlayer.cleanup();
+      miniPlayer = createMiniPlayer(nextVideo, miniPlayerOptions);
+    },
     cleanup() {
       cleaningUp = true;
       pipWindow.removeEventListener("pagehide", onPageHide);
@@ -2130,32 +2225,96 @@ async function createDocumentPipMiniPlayer(video) {
   };
 }
 
-async function startBetterPicture() {
+async function startBetterPictureOnce({ requireDocumentPip = false } = {}) {
+  const startedAt = performance.now();
+  const video = findBestVideo();
+
+  debugLog("start requested", {
+    requireDocumentPip,
+    hasVideo: Boolean(video),
+    documentPipSupported: canUseDocumentPip()
+  });
+
+  if (!video) {
+    debugLog("start skipped: no visible video");
+    return getStatus();
+  }
+
+  if (requireDocumentPip && !canUseDocumentPip()) {
+    return {
+      ...getStatus(),
+      error: "Document Picture-in-Picture is not supported by this browser."
+    };
+  }
+
+  if (canUseDocumentPip() && hasDocumentPipUserActivation()) {
+    try {
+      betterPicture = await createDocumentPipMiniPlayer(video);
+      debugLog("mini-player started", {
+        mode: "documentPip",
+        durationMs: Math.round(performance.now() - startedAt)
+      });
+      return getStatus();
+    } catch (error) {
+      debugLog("Document Picture-in-Picture failed", {
+        name: error?.name || "Error",
+        message: error?.message || String(error)
+      });
+      if (requireDocumentPip) {
+        return {
+          ...getStatus(),
+          error: error?.name === "NotAllowedError"
+            ? "Document Picture-in-Picture needs a click from the video tab. Try again while that tab is active."
+            : "Better Picture could not open the Picture-in-Picture window."
+        };
+      }
+
+      if (error?.name !== "NotAllowedError") {
+        console.info("Better Picture could not open Document Picture-in-Picture. Falling back to the in-page player.", error);
+      }
+    }
+  }
+
+  if (requireDocumentPip) {
+    return {
+      ...getStatus(),
+      error: "Document Picture-in-Picture needs a click from the video tab. Try again while that tab is active."
+    };
+  }
+
+  betterPicture = createMiniPlayer(video);
+  debugLog("mini-player started", {
+    mode: "pageOverlay",
+    durationMs: Math.round(performance.now() - startedAt)
+  });
+  return getStatus();
+}
+
+async function startBetterPicture(options = {}) {
   if (betterPicture) {
     return getStatus();
   }
 
-  const video = findBestVideo();
-
-  if (!video) {
-    return getStatus();
+  if (betterPictureStartPromise) {
+    return betterPictureStartPromise;
   }
 
-  if (canUseDocumentPip()) {
-    try {
-      betterPicture = await createDocumentPipMiniPlayer(video);
-      return getStatus();
-    } catch (error) {
-      console.info("Better Picture could not open Document Picture-in-Picture. Falling back to the in-page player.", error);
+  const startPromise = startBetterPictureOnce(options);
+  betterPictureStartPromise = startPromise;
+
+  try {
+    return await startPromise;
+  } finally {
+    if (betterPictureStartPromise === startPromise) {
+      betterPictureStartPromise = null;
     }
   }
-
-  betterPicture = createMiniPlayer(video);
-  return getStatus();
 }
 
 function stopBetterPicture() {
   if (betterPicture) {
+    const displayMode = betterPicture.displayMode;
+    debugLog("stopping mini-player", { mode: displayMode });
     betterPicture.cleanup();
     betterPicture = null;
   }
@@ -2176,13 +2335,19 @@ function getStatus() {
   };
 }
 
+document.addEventListener(USER_GESTURE_START_EVENT, () => {
+  startBetterPicture({ requireDocumentPip: true }).catch((error) => {
+    console.error("Better Picture could not start from the popup gesture.", error);
+  });
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message?.type) {
     return false;
   }
 
   if (message.type === BETTER_PICTURE_MESSAGE_TYPES.START) {
-    startBetterPicture()
+    startBetterPicture({ requireDocumentPip: Boolean(message.requireDocumentPip) })
       .then(sendResponse)
       .catch((error) => {
         console.error("Better Picture could not start.", error);

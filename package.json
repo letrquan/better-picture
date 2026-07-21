@@ -1,0 +1,14 @@
+{
+  "name": "better-picture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automated browser tests for the Better Picture Chromium extension.",
+  "scripts": {
+    "test": "npm run test:browser",
+    "test:browser": "playwright test",
+    "test:browser:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}

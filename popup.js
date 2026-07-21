@@ -4,6 +4,27 @@ const MESSAGE_TYPES = {
   STATUS_REQUEST: "BETTER_PICTURE_STATUS_REQUEST",
   SCAN_TABS: "BETTER_PICTURE_SCAN_TABS"
 };
+const USER_GESTURE_START_EVENT = "better-picture-start-from-user-gesture";
+const DEBUG_STORAGE_KEY = "debugLogging";
+const DEBUG_PREFIX = "[Better Picture][popup]";
+let debugLoggingEnabled = false;
+
+function debugLog(event, details) {
+  if (!debugLoggingEnabled) return;
+
+  if (details === undefined) {
+    console.debug(DEBUG_PREFIX, event);
+  } else {
+    console.debug(DEBUG_PREFIX, event, details);
+  }
+}
+
+chrome.storage.local.get(DEBUG_STORAGE_KEY)
+  .then((result) => {
+    debugLoggingEnabled = Boolean(result?.[DEBUG_STORAGE_KEY]);
+    debugLog("debug logging enabled");
+  })
+  .catch(() => {});
 
 const controlSourceLabel = document.querySelector("#controlSourceLabel");
 const resetToActiveButton = document.querySelector("#resetToActiveButton");
@@ -43,17 +64,31 @@ async function injectContentScript(tabId) {
   });
 }
 
-async function sendMessageToTab(tabId, type) {
+async function sendMessageToTab(tabId, type, details = {}) {
+  const message = { type, ...details };
+
   try {
-    return await chrome.tabs.sendMessage(tabId, { type });
+    return await chrome.tabs.sendMessage(tabId, message);
   } catch (error) {
     if (!isMissingContentScriptError(error)) {
       throw error;
     }
 
     await injectContentScript(tabId);
-    return chrome.tabs.sendMessage(tabId, { type });
+    return chrome.tabs.sendMessage(tabId, message);
   }
+}
+
+async function startDocumentPipFromPopup(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (eventName) => {
+      document.dispatchEvent(new CustomEvent(eventName));
+    },
+    args: [USER_GESTURE_START_EVENT]
+  });
+
+  return sendMessageToTab(tabId, MESSAGE_TYPES.START, { requireDocumentPip: true });
 }
 
 function extractDomain(url) {
@@ -136,6 +171,11 @@ function renderStatus(response) {
   stopButton.disabled = !isRunning;
   setMeta(formatDisplayMode(displayMode), formatSubtitleMode(subtitleMode));
 
+  if (response?.error) {
+    setStatus(response.error, "error");
+    return;
+  }
+
   if (!hasVideo) {
     setStatus("No playable video found on this page.", "error");
     return;
@@ -174,12 +214,17 @@ function setScanStatus(message, state = "scanning") {
 }
 
 async function scanTabs() {
+  const startedAt = performance.now();
   setScanStatus("Scanning other tabs...", "scanning");
   tabListElement.replaceChildren();
 
   try {
     const tabs = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SCAN_TABS });
     lastScanResults = Array.isArray(tabs) ? tabs : [];
+    debugLog("tab scan completed", {
+      results: lastScanResults.length,
+      durationMs: Math.round(performance.now() - startedAt)
+    });
   } catch (error) {
     console.error("Better Picture scan failed.", error);
     lastScanResults = [];
@@ -333,7 +378,13 @@ startButton.addEventListener("click", async () => {
   setStatus("Starting Better Picture...", "checking");
 
   try {
-    const res = await sendMessageToTab(controlledTab.id, MESSAGE_TYPES.START);
+    const res = await startDocumentPipFromPopup(controlledTab.id);
+    debugLog("start response", {
+      tabId: controlledTab.id,
+      isRunning: Boolean(res?.isRunning),
+      displayMode: res?.displayMode || "none",
+      error: res?.error || null
+    });
     renderStatus(res);
     // Refresh tab list to update active/running indicator dot
     scanTabs();
@@ -351,6 +402,7 @@ stopButton.addEventListener("click", async () => {
 
   try {
     const res = await sendMessageToTab(controlledTab.id, MESSAGE_TYPES.STOP);
+    debugLog("stop response", { tabId: controlledTab.id, isRunning: Boolean(res?.isRunning) });
     renderStatus(res);
     // Refresh tab list to update active/running indicator dot
     scanTabs();
